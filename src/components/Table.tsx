@@ -29,6 +29,16 @@ export interface OperatorConfig {
   label: string;
 }
 
+type OperatorType =
+  | ""
+  | "contains"
+  | "equals"
+  | "startsWith"
+  | "endsWith"
+  | "greaterThan"
+  | "lessThan";
+
+
 interface UIProps<T> {
   columns: Column<T>[];
   paginatedData: T[];
@@ -41,15 +51,13 @@ interface UIProps<T> {
   setFilterColumn: React.Dispatch<React.SetStateAction<keyof T | "">>;
   filterOperator: OperatorConfig["value"] | "";
   setFilterOperator: React.Dispatch<
-    React.SetStateAction<OperatorConfig["value"] | "">
+    React.SetStateAction<OperatorType>
   >;
   filterValue: string;
   setFilterValue: React.Dispatch<React.SetStateAction<string>>;
   handlePageChange: (page: number) => void;
   handleClearFilter: () => void;
   operators: OperatorConfig[];
-  isTableVisible?: boolean;
-  setIsTableVisible?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // function getValue<T>(row: T, accessor: Column<T>["accessor"]): React.ReactNode {
@@ -63,11 +71,11 @@ const Table = <T extends object>({ columns, data, itemsPerPage = 10 }: TableProp
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterColumn, setFilterColumn] = useState<keyof T | ''>('');
-  const [filterOperator, setFilterOperator] = useState('');
+  const [filterOperator, setFilterOperator] = useState<OperatorType>('');
   const [filterValue, setFilterValue] = useState('');
   const [isTableVisible, setIsTableVisible] = useState(true);
 
-  const operators = [
+  const operators: OperatorConfig[] = [
     { value: 'contains', label: 'Contains' },
     { value: 'equals', label: 'Equals' },
     { value: 'startsWith', label: 'Starts With' },
@@ -211,116 +219,6 @@ const Table = <T extends object>({ columns, data, itemsPerPage = 10 }: TableProp
 
 };
 
-// function SearchAndFilterBar<T extends object>({
-//   columns,
-//   searchTerm,
-//   setSearchTerm,
-//   filterColumn,
-//   setFilterColumn,
-//   filterOperator,
-//   setFilterOperator,
-//   filterValue,
-//   setFilterValue,
-//   handleClearFilter,
-//   operators
-// }: {
-//   columns: Column<T>[];
-//   searchTerm: string;
-//   setSearchTerm: (v: string) => void;
-
-//   filterColumn: keyof T | "";
-//   setFilterColumn: (v: keyof T | "") => void;
-
-//   filterOperator: OperatorConfig["value"] | "";
-//   setFilterOperator: (v: OperatorConfig["value"] | "") => void;
-
-//   filterValue: string;
-//   setFilterValue: (v: string) => void;
-
-//   handleClearFilter: () => void;
-//   operators: OperatorConfig[];
-// }) {
-//   return (
-//     <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-//       {/* Search */}
-//       <div className="relative w-full md:w-1/3 mb-4 md:mb-0">
-//         <input
-//           type="text"
-//           placeholder="Global Search..."
-//           className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white 
-//           dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 
-//           focus:ring-blue-500"
-//           value={searchTerm}
-//           onChange={(e) => setSearchTerm(e.target.value)}
-//         />
-//       </div>
-
-//       {/* Filters */}
-//       <div className="flex items-center w-full md:w-auto rounded-xl border border-gray-300 dark:border-gray-700 
-//         bg-white dark:bg-gray-800 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition">
-
-//         {/* Column */}
-//         <select
-//           value={filterColumn as string}
-//           onChange={(e) => setFilterColumn(e.target.value as keyof T | "")}
-//           className="px-4 py-2.5 min-w-[150px] bg-transparent border-none outline-none 
-//           text-gray-900 dark:text-gray-200"
-//         >
-//           <option value="">Column</option>
-//           {columns.map((col) => (
-//             <option
-//               key={typeof col.accessor === "string" ? col.accessor : col.header}
-//               value={typeof col.accessor === "string" ? col.accessor : ""}
-//             >
-//               {col.header}
-//             </option>
-//           ))}
-//         </select>
-
-//         <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
-
-//         {/* Operator */}
-//         <select
-//           value={filterOperator}
-//           onChange={(e) => setFilterOperator(e.target.value as OperatorConfig["value"])}
-//           disabled={!filterColumn}
-//           className="px-4 py-2.5 min-w-[130px] bg-transparent border-none outline-none 
-//             text-gray-900 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
-//         >
-//           <option value="">Operator</option>
-//           {operators.map((op) => (
-//             <option key={op.value} value={op.value}>{op.label}</option>
-//           ))}
-//         </select>
-
-//         <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
-
-//         {/* Value */}
-//         <input
-//           type="text"
-//           placeholder="Value"
-//           value={filterValue}
-//           onChange={(e) => setFilterValue(e.target.value)}
-//           disabled={!filterOperator}
-//           className="px-4 py-2.5 min-w-[150px] bg-transparent border-none outline-none 
-//           text-gray-900 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
-//         />
-
-//         <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
-
-//         {/* Clear */}
-//         <button
-//           onClick={handleClearFilter}
-//           className="px-4 py-2.5 font-medium bg-transparent text-red-600 dark:text-red-400 
-//           hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-//         >
-//           Clear
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-
 function SearchAndFilterBar<T extends object>({
   columns,
   searchTerm,
@@ -351,6 +249,9 @@ function SearchAndFilterBar<T extends object>({
 
   handleClearFilter: () => void;
   operators: OperatorConfig[];
+
+  isTableVisible?: boolean;
+  setIsTableVisible?: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
@@ -379,7 +280,7 @@ function SearchAndFilterBar<T extends object>({
             checked={isTableVisible}
             activeImages={[FilledGridSVG, FilledTableSVG]}
             inActiveImages={[GridSVG, TableSVG]}
-            onChange={() => setIsTableVisible(!isTableVisible)} />
+            onChange={() => setIsTableVisible && setIsTableVisible(!isTableVisible)} />
         </div>
 
         <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
@@ -479,7 +380,7 @@ function PaginationBar({
 }
 
 function TableUI<T extends object>(props: UIProps<T>) {
-  const { columns, paginatedData, filteredData } = props;
+  const { columns, paginatedData } = props;
 
   return (
 
@@ -557,7 +458,6 @@ function CardTableUI<T extends object>(props: UIProps<T>) {
     </div>
   );
 }
-// >(''
 
 function FilterModal<T extends object>({
   show,

@@ -19,14 +19,14 @@ export interface FormField<T> {
   options?: OptionData[];
   dependsOn?: keyof T;
   getOptions?: (
-    value: any,
-    allData: Record<string, any>
+    value: unknown,
+    allData: Record<string, unknown>
   ) => OptionData[] | Promise<OptionData[]>;
 }
 
 interface FormProps<T extends object> {
   fields: FormField<T>[];
-  onSubmit: (data: Record<string, any>) => void;
+  onSubmit: (data: Partial<T>) => Promise<void> | void; // ✅ match your handlers
   onClose: () => void;
   initialData: T;
 }
@@ -37,13 +37,13 @@ const Form = <T extends object>({
   onClose,
   initialData,
 }: FormProps<T>) => {
-  const [formData, setFormData] = useState<Record<string, any>>(initialData);
+  const [formData, setFormData] = useState<Record<string, unknown>>(initialData as Record<string, unknown>);
 
   const [dynamicOptions, setDynamicOptions] = useState<
     Record<string, OptionData[]>
   >({});
 
-  const prevDataRef = useRef<Record<string, any>>(formData);
+  const prevDataRef = useRef<Record<string, unknown>>(formData);
 
   // Extract dependent fields
   const dependentFields = fields.filter(
@@ -52,12 +52,13 @@ const Form = <T extends object>({
     name: keyof T;
     label: string;
     dependsOn: keyof T;
-    getOptions: (v: any, all: Record<string, any>) => OptionData[] | Promise<OptionData[]>;
+    getOptions: (v: unknown, all: Record<string, unknown>) => OptionData[] | Promise<OptionData[]>;
   }>;
 
   /**
    * --- FIXED DYNAMIC OPTIONS LOADING ---
    */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const prev = prevDataRef.current;
 
@@ -91,8 +92,8 @@ const Form = <T extends object>({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    onSubmit(formData);
-    setFormData(initialData);
+    onSubmit(formData as Partial<T>);
+    setFormData(initialData as Record<string, unknown>);
     onClose();
   };
 
@@ -117,7 +118,7 @@ const Form = <T extends object>({
           <select
             id={key}
             name={key}
-            value={formData[key] ?? ""}
+            value={String(formData[key] ?? "")}
             onChange={handleChange}
             className="
             p-3 rounded-lg w-full
@@ -144,7 +145,7 @@ const Form = <T extends object>({
             id={key}
             name={key}
             type={field.type}
-            value={formData[key] ?? ""}
+            value={String(formData[key] ?? "")}
             onChange={handleChange}
             className="
             p-3 rounded-lg w-full
@@ -187,7 +188,7 @@ const Form = <T extends object>({
             id={key}
             name={key}
             type="text"
-            value={formData[key] ?? ""}
+            value={String(formData[key] ?? "")}
             onChange={handlePhoneChange}
             className="
             p-3 rounded-lg w-full
@@ -205,7 +206,7 @@ const Form = <T extends object>({
             id={key}
             name={key}
             type="email"
-            value={formData[key] ?? ""}
+            value={String(formData[key] ?? "")}
             onChange={handleEmailChange}
             className="
             p-3 rounded-lg w-full

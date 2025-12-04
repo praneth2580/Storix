@@ -137,7 +137,7 @@ const SuppliersPage = () => {
                 )}
 
                 <Modal show={showModal} size='xl' onClose={() => setShowModal(false)} title='Add New Product'>
-                    <Form
+                    <Form<Supplier>
                         fields={supplierFormFields}
                         onSubmit={handleAddProduct}
                         onClose={() => setShowModal(false)}

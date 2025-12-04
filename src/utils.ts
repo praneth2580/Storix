@@ -20,7 +20,7 @@ export function jsonpRequest<T>(
     )}`;
     (window as any)[callbackName] = (response: any) => {
       try {
-        console.log(`✅ JSONP Response [${sheet}]`, response);
+        // console.log(`✅ JSONP Response [${sheet}]`, response);
         resolve(Array.isArray(response) ? response : response.data || []);
       } catch (err) {
         reject(err);

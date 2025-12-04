@@ -4,8 +4,8 @@ import React from "react";
 interface ToggleProps {
   checked?: boolean;                // controlled value
   defaultChecked?: boolean;         // uncontrolled default
-  activeImages?: [];
-  inActiveImages?: [];
+  activeImages?: React.FC<React.SVGProps<SVGSVGElement>>[];
+  inActiveImages?: React.FC<React.SVGProps<SVGSVGElement>>[];
   onChange?: (value: boolean) => void;
   size?: "sm" | "md" | "lg";
   disabled?: boolean;

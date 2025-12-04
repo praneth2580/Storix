@@ -92,7 +92,7 @@ const StockPage = () => {
         { name: 'productId', label: 'Product', type: 'select', options: products.map(product => ({ value: product.id, label: product.name })) },
         {
             name: 'variantId', label: 'Variant', type: 'select', dependsOn: 'productId', getOptions: async (category) => {
-                const optiondata = await getProductVariants(category);
+                const optiondata = await getProductVariants(String(category));
                 return optiondata || [];
             }
         },
@@ -158,7 +158,7 @@ const StockPage = () => {
                 )}
 
                 <Modal show={showModal} size='xl' onClose={() => setShowModal(false)} title='Add New Stock'>
-                    <Form
+                    <Form<Stock>
                         fields={stockFormFields}
                         onSubmit={handleAddStock}
                         onClose={() => setShowModal(false)}
