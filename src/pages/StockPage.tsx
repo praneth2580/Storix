@@ -68,7 +68,8 @@ const StockPage = () => {
 
     const columns = [
         { header: 'ID', accessor: 'id' as keyof Stock },
-        { header: 'Product Name', accessor: 'product.name' as keyof Stock },
+        { header: 'Product Name', accessor: (row: Stock) => row.product?.name
+        },
         {
             header: 'Variant', accessor: (row: Stock) => row.variant?.attributes ?
                 <div className='flex gap-1 wrap'>{Object.entries(row.variant.attributes)?.map(_variant => { return <div className='rounded-full bg-blue-400 w-fit py-1 px-2 text-white uppercase font-bold'>{_variant[1]}</div> })}</div> :

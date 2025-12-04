@@ -442,11 +442,9 @@ function CardTableUI<T extends object>(props: UIProps<T>) {
                 </p>
               </div>
 
-              <p className="text-base font-medium text-gray-900 dark:text-gray-200">
-                {typeof col.accessor === "function"
-                  ? col.accessor(row)
-                  : (row[col.accessor] as React.ReactNode)}
-              </p>
+              {typeof col.accessor === "function"
+                  ? <div className="text-base font-medium text-gray-900 dark:text-gray-200">{col.accessor(row)}</div>
+                  : <p className="text-base font-medium text-gray-900 dark:text-gray-200">{(row[col.accessor] as React.ReactNode)}</p>}
 
               {j !== columns.length - 1 && (
                 <div className="h-px bg-gray-200 dark:bg-gray-700 mt-3" />

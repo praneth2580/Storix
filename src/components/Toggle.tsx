@@ -136,14 +136,14 @@ export function FancyToggle({
         `}
       >
         {/* LEFT ICON */}
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20">
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10">
           {!isOn
             ? ActiveLeft && <ActiveLeft className={sizes[size].icon} />
             : InactiveLeft && <InactiveLeft className={sizes[size].icon} />}
         </div>
 
         {/* RIGHT ICON */}
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20">
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
           {isOn
             ? ActiveRight && <ActiveRight className={sizes[size].icon} />
             : InactiveRight && <InactiveRight className={sizes[size].icon} />}
@@ -155,7 +155,7 @@ export function FancyToggle({
             ${sizes[size].knob}
             absolute top-1 left-1 
             rounded-full bg-blue-400 border border-blue-300 shadow
-            transition-transform duration-300 ease-out z-10
+            transition-transform duration-300 ease-out z-5
             ${isOn ? sizes[size].shift : ""}
           `}
         />

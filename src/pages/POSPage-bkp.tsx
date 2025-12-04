@@ -73,6 +73,8 @@ const POSPage = () => {
         );
     };
 
+
+
     const addToCart = (variant: Variant) => {
         setCart(prev => {
             const found = prev.find(v => v.id === variant.id);
@@ -84,6 +86,7 @@ const POSPage = () => {
             return [...prev, { ...variant, count: 1 } as CartItem];
         });
     };
+
 
     return (
         <div className="p-5 h-screen bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100 relative overflow-hidden">
@@ -118,68 +121,64 @@ const POSPage = () => {
                 </div>
             </div>
 
-            <div className="flex flex-row gap-4 relative">
-                {/* CATEGORY TABS */}
-                <div className="flex flex-col md:w-[20vw] md:static w-full h-full bg-gray-100 dark:bg-gray-950 absolute gap-3 mb-6 overflow-x-auto pb-1 no-scrollbar">
-                    {categories.map((cat, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => setActiveCategory(cat ?? "")}
-                            className={`px-5 py-2 rounded-md font-medium 
-                            transition-all duration-200 whitespace-nowrap
-                            shadow-sm border 
-                            ${activeCategory === cat
-                                    ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                                    : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700"
-                                }`}
+            {/* CATEGORY TABS */}
+            <div className="flex gap-3 mb-6 overflow-x-auto pb-1 no-scrollbar">
+                {categories.map((cat, idx) => (
+                    <button
+                        key={idx}
+                        onClick={() => setActiveCategory(cat ?? "")}
+                        className={`px-5 py-2 rounded-full font-medium 
+                        transition-all duration-200 whitespace-nowrap
+                        shadow-sm border 
+                        ${activeCategory === cat
+                                ? "bg-blue-600 text-white border-blue-600 shadow-md scale-105"
+                                : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700"
+                            }`}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </div>
+
+            {/* PRODUCT GRID */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+
+                <AnimatePresence>
+                    {filteredItems.map((variant, index) => (
+                        <motion.div
+                            key={index}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700
+                            shadow-sm hover:shadow-md transition cursor-pointer p-4 flex flex-col"
                         >
-                            {cat}
-                        </button>
+                            {/* IMAGE PLACEHOLDER */}
+                            <div className="h-28 bg-gray-200 dark:bg-gray-800 rounded-lg mb-3" />
+
+                            {/* TEXT */}
+                            <p className="font-semibold text-lg">{variant.product?.name}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {Object.values(variant.attributes).join(" - ")}
+                            </p>
+
+                            <div className="mt-auto pt-3">
+                                <p className="text-xl font-bold text-blue-600">₹{variant.sellingPrice || 200}</p>
+
+                                {cart.findIndex(item => item.id === variant.id) === -1 ? <button
+                                    onClick={() => addToCart(variant)}
+                                    className="w-full mt-3 bg-blue-600 text-white py-2 rounded-lg 
+                                    hover:bg-blue-700 active:scale-[0.98] transition"
+                                >
+                                    Add to Cart
+                                </button> : <div className="w-fit mx-auto"><CountHandler handleCountChange={(increment) => handleCountChange(variant, increment)} itemCount={cart.find(item => item.id === variant.id)?.count || 0} /></div>}
+
+                            </div>
+                        </motion.div>
                     ))}
-                </div>
+                </AnimatePresence>
 
-                {/* PRODUCT GRID */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-5">
-
-                    <AnimatePresence>
-                        {filteredItems.map((variant, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.15 }}
-                                className="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition cursor-pointer p-4 flex flex-col justify-between"
-                            >
-                                {/* IMAGE PLACEHOLDER */}
-                                {/* <div className="h-28 bg-gray-200 dark:bg-gray-800 rounded-lg mb-3" /> */}
-
-                                <div className="flex flex-row flex-nowrap justify-between">
-                                    {/* TEXT */}
-                                    <p className="font-semibold text-md">{variant.product?.name}</p>
-
-                                    <p className="text-xl font-bold text-blue-600">₹{variant.sellingPrice || 200}</p>
-                                </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    {Object.values(variant.attributes).join(" - ")}
-                                </p>
-
-                                {/* <div className="mt-auto pt-3"> */}
-
-                                    {cart.findIndex(item => item.id === variant.id) === -1 ? <button
-                                        onClick={() => addToCart(variant)}
-                                        className="w-full mt-3 bg-blue-600 text-white py-2 rounded-lg 
-                                        hover:bg-blue-700 active:scale-[0.98] transition"
-                                    >
-                                        Add to Cart
-                                    </button> : <div className="w-fit mx-auto"><CountHandler handleCountChange={(increment) => handleCountChange(variant, increment)} itemCount={cart.find(item => item.id === variant.id)?.count || 0} /></div>}
-
-                                {/* </div> */}
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-
-                </div>
             </div>
 
             {/* EMPTY STATE */}
