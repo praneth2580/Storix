@@ -1,28 +1,79 @@
+import { parseAttributes } from "../utils";
+
 // 📦 Product / Inventory Item
 export interface IProduct {
-  id: string; // Unique ID
+  id: string;
   name: string;
   category: string;
   description?: string;
-  sku?: string; // Stock Keeping Unit
+
   barcode?: string;
-  quantity: number;
-  costPrice: number;
-  sellingPrice: number;
-  supplierId?: string;
-  lowStockThreshold?: number;
+  hasVariants: boolean,
+
+  // NEW — product inventory type
+  type: "simple" | "measured" | "variant";
+
+  // For measured products only (kg, g, L, ml …)
+  baseUnit?: string;
+
+  // Default prices (variant can override)
+  defaultCostPrice: number;
+  defaultSellingPrice: number;
+
   createdAt: string;
+  updatedAt: string;
+}
+
+// Variant
+export interface IVariant {
+  id: string;
+  productId: string;
+
+  sku?: string;
+
+  // Flexible dynamic attributes — size, color, material, etc.
+  attributes: Record<string, string>;
+
+  // Per-variant pricing (optional)
+  costPrice?: number;
+  sellingPrice?: number;
+
+  product?: IProduct;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Stock
+export interface IStock {
+  id: string;
+  productId: string;
+  variantId?: string | null;
+
+  product?: Product;
+  variant?: Variant;
+
+  // For simple = units  
+  // For measured = weight/volume  
+  // For variants = units per variant
+  quantity: number;
+
   updatedAt: string;
 }
 
 // 🧾 Sale Transaction
 export interface ISale {
   id: string;
+
   productId: string;
-  quantity: number;
-  sellingPrice: number;
+  variantId?: string | null;
+
+  quantity: number;       // units or weight
+  sellingPrice: number;   // final applied price
   total: number;
+
   date: string;
+
   customerName?: string;
   paymentMethod?: "cash" | "card" | "upi" | "other";
 }
@@ -30,12 +81,16 @@ export interface ISale {
 // 📥 Purchase / Stock-In
 export interface IPurchase {
   id: string;
+
   productId: string;
-  supplierId?: string;
-  quantity: number;
+  variantId?: string | null;
+
+  quantity: number;   // units or weight
   costPrice: number;
   total: number;
+
   date: string;
+  supplierId?: string;
   invoiceNumber?: string;
 }
 
@@ -79,13 +134,14 @@ export class Product implements IProduct {
   name: string;
   category: string;
   description?: string;
-  sku?: string;
   barcode?: string;
-  quantity: number;
-  costPrice: number;
-  sellingPrice: number;
-  supplierId?: string;
-  lowStockThreshold?: number;
+  type: "simple" | "measured" | "variant";
+  baseUnit?: string;
+  hasVariants: boolean;
+
+  defaultCostPrice: number;
+  defaultSellingPrice: number;
+
   createdAt: string;
   updatedAt: string;
 
@@ -94,22 +150,91 @@ export class Product implements IProduct {
     this.name = data.name;
     this.category = data.category;
     this.description = data.description;
-    this.sku = data.sku;
     this.barcode = data.barcode;
-    this.quantity = data.quantity;
-    this.costPrice = data.costPrice;
-    this.sellingPrice = data.sellingPrice;
-    this.supplierId = data.supplierId;
-    this.lowStockThreshold = data.lowStockThreshold;
+    this.hasVariants = data.hasVariants;
+    this.type = data.type;
+    this.baseUnit = data.baseUnit;
+    this.defaultCostPrice = data.defaultCostPrice;
+    this.defaultSellingPrice = data.defaultSellingPrice;
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }
 
-  get profitMargin(): number {
-    return this.sellingPrice - this.costPrice;
+  get baseProfitMargin(): number {
+    return this.defaultSellingPrice - this.defaultCostPrice;
+  }
+}
+
+export class Variant implements IVariant {
+  id: string;
+  productId: string;
+  sku?: string;
+  // Flexible dynamic attributes — size, color, material, etc.
+  attributes: Record<string, string>;
+  // Per-variant pricing (optional)
+  costPrice: number;
+  sellingPrice: number;
+  product?: IProduct | undefined;
+  createdAt: string;
+  updatedAt: string;
+
+  constructor(data: IVariant) {
+    this.id = data.id;
+    this.productId = data.productId;
+    this.sku = data.sku;
+    this.attributes = parseAttributes(String(data.attributes));
+    if (data.product) this.product = new Product(data.product);
+    this.costPrice = data.costPrice || 0;
+    this.sellingPrice = data.sellingPrice || 0;
+    this.createdAt = data.createdAt;
+    this.updatedAt = data.updatedAt;
   }
 
-  isLowStock(): boolean {
-    return this.quantity <= (this.lowStockThreshold ?? 0);
+  get baseProfitMargin(): number {
+    return this.sellingPrice - this.costPrice;
+  }
+}
+
+export class Supplier implements ISupplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+
+  constructor(data: ISupplier) {
+    this.id = data.id;
+    this.name = data.name;
+    this.contactPerson = data.contactPerson;
+    this.phone = data.phone;
+    this.email = data.email;
+    this.address = data.address;
+    this.notes = data.notes;
+    this.createdAt = data.createdAt;
+    this.updatedAt = data.updatedAt;
+  }
+}
+
+export class Stock implements IStock {
+  id: string;
+  productId: string;
+  variantId?: string | null;
+  product?: Product | undefined;
+  variant?: Variant | undefined;
+  quantity: number;
+  updatedAt: string;
+
+  constructor(data: IStock) {
+    this.id = data.id;
+    this.productId = data.productId;
+    this.variantId = data.variantId;
+    if (data.product) this.product = new Product(data.product);
+    if (data.variant) this.variant = new Variant(data.variant);
+    this.quantity = data.quantity;
+    this.updatedAt = data.updatedAt;
   }
 }

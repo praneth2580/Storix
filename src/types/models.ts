@@ -44,6 +44,25 @@ export interface IVariant {
   updatedAt: string;
 }
 
+// 👤 Customer
+export interface ICustomer {
+  id: string;
+  name: string;
+
+  phone?: string;
+  email?: string;
+
+  address?: string;
+  notes?: string;
+
+  // Optional useful business fields
+  gstNumber?: string;
+  outstandingBalance?: number; // if you allow credit sales
+
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Stock
 export interface IStock {
   id: string;
@@ -74,7 +93,8 @@ export interface ISale {
 
   date: string;
 
-  customerName?: string;
+  customerId?: string;
+  customer?: ICustomer;
   paymentMethod?: "cash" | "card" | "upi" | "other";
 }
 
@@ -214,6 +234,35 @@ export class Supplier implements ISupplier {
     this.email = data.email;
     this.address = data.address;
     this.notes = data.notes;
+    this.createdAt = data.createdAt;
+    this.updatedAt = data.updatedAt;
+  }
+}
+
+export class Customer implements ICustomer {
+  id: string;
+  name: string;
+  phone?: string | undefined;
+  email?: string | undefined;
+  address?: string | undefined;
+  notes?: string | undefined;
+  gstNumber?: string | undefined;
+  outstandingBalance: number;
+  createdAt: string;
+  updatedAt: string;
+
+  constructor(data: ICustomer) {
+    this.id = data.id;
+    this.name = data.name;
+
+    this.phone = data.phone;
+    this.email = data.email;
+    this.address = data.address;
+    this.notes = data.notes;
+
+    this.gstNumber = data.gstNumber;
+    this.outstandingBalance = data.outstandingBalance || 0;
+
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }

@@ -8,6 +8,7 @@ import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import HelpPage from "./pages/HelpPage";
 import AboutPage from "./pages/AboutPage";
+import CustomerPage from "./pages/CustomerPage";
 
 export interface RouteItem {
   path: string;
@@ -28,6 +29,12 @@ export const routeConfig: RouteItem[] = [
     name: 'Product',
     icon: '/logo.png',
     component: ProductPage,
+  },
+  {
+    path: '/customer',
+    name: 'Customer',
+    icon: '/logo.png',
+    component: CustomerPage,
   },
   {
     path: '/stock',
