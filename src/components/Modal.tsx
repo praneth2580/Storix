@@ -30,7 +30,7 @@ const Modal: React.FC<ModalProps> = ({ show, onClose, title, children, size = 'l
         bg-white dark:bg-gray-900
         border border-gray-200 dark:border-gray-700
         shadow-xl dark:shadow-2xl
-        transition-colors
+        transition-colors z-20
       `}
       >
         {/* Header */}

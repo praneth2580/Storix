@@ -55,12 +55,12 @@ const SuppliersPage = () => {
     ];
 
     const supplierFormFields: FormField<Supplier>[] = [
-        { name: 'name', label: 'Supplier Name', type: 'text' },
-        { name: 'contactPerson', label: 'Contact Person', type: 'text' },
-        { name: 'phone', label: 'Phone', type: 'phone' },
-        { name: 'email', label: 'Email', type: 'email' },
-        { name: 'address', label: 'Address', type: 'text' },
-        { name: 'notes', label: 'Notes', type: 'text' }
+        { name: 'name', label: 'Supplier Name', required: true, type: 'text' },
+        { name: 'contactPerson', label: 'Contact Person', required: true, type: 'text' },
+        { name: 'phone', label: 'Phone', required: true, type: 'phone' },
+        { name: 'email', label: 'Email', required: true, type: 'email' },
+        { name: 'address', label: 'Address', required: true, type: 'text' },
+        { name: 'notes', label: 'Notes', required: false, type: 'text' }
     ];
 
     const handleAddProduct = async (formData: Partial<ISupplier>) => {

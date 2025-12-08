@@ -90,14 +90,14 @@ const StockPage = () => {
     ];
 
     const stockFormFields: FormField<Stock>[] = [
-        { name: 'productId', label: 'Product', type: 'select', options: products.map(product => ({ value: product.id, label: product.name })) },
+        { name: 'productId', label: 'Product', required: true, type: 'select', options: products.map(product => ({ value: product.id, label: product.name })) },
         {
-            name: 'variantId', label: 'Variant', type: 'select', dependsOn: 'productId', getOptions: async (category) => {
+            name: 'variantId', label: 'Variant', required: true, type: 'select', dependsOn: 'productId', getOptions: async (category) => {
                 const optiondata = await getProductVariants(String(category));
                 return optiondata || [];
             }
         },
-        { name: 'quantity', label: 'Quantity', type: 'number' },
+        { name: 'quantity', label: 'Quantity', required: true, type: 'number' },
     ];
 
     const handleAddStock = async (formData: Partial<IStock>) => {

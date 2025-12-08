@@ -11,58 +11,7 @@ const Layout = () => {
   const toggleNav = () => {
     setIsNavOpen(!isNavOpen);
   };
-
-  // return (
-  //   <div className={`flex h-screen bg-gray-100 dark:bg-gray-950 ${isNavOpen ? 'overflow-hidden' : ''}`}>
-  //     <div className="md:hidden flex items-center justify-between p-2 bg-white border-b border-gray-200 w-full fixed">
-  //       <button className="text-2xl bg-transparent border-none cursor-pointer text-black" onClick={toggleNav}>
-  //         &#9776;
-  //       </button>
-  //     </div>
-  //     <nav className={`fixed top-0 left-0 h-full w-64 flex-shrink-0 bg-white dark:bg-slate-950 border-r border-gray-200 p-5 flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isNavOpen ? 'translate-x-0 z-50' : '-translate-x-full'}`}>
-  //       <div className="flex items-center mb-5">
-  //         <div className={`bg-[url(/Storix/banner.png)] w-full h-15 mr-3 bg-cover bg-center rounded`} />
-  //       </div>
-  //       <ul className="list-none p-0 m-0 h-full">
-  //         {routeConfig.map((route) => (
-  //           <li key={route.path}>
-  //             <NavLink
-  //               to={route.path}
-  //               className={({ isActive }) =>
-  //                 `block p-4 text-gray-700 rounded-lg mb-2 transition-colors duration-300 ${isActive ? 'bg-blue-100 text-blue-500 font-bold' : 'hover:bg-blue-100 hover:text-blue-500'
-  //                 }`
-  //               }
-  //               onClick={() => setIsNavOpen(false)}
-  //             >
-  //               {route.name}
-  //             </NavLink>
-  //           </li>
-  //         ))}
-  //         <li key="/pos">
-  //           <NavLink
-  //             to="/pos"
-  //             target="_blank" rel="noopener noreferrer"
-  //             className={({ isActive }) =>
-  //               `block p-4 bg-blue-400 text-white text-center font-bold rounded-lg mb-2 transition-colors duration-300 ${isActive ? 'bg-blue-100 text-blue-500 font-bold' : 'hover:bg-blue-100 hover:text-blue-500'
-  //               }`
-  //             }
-
-  //             onClick={() => setIsNavOpen(false)}
-  //           >
-  //             POS
-  //           </NavLink>
-  //         </li>
-  //       </ul>
-  //       <div className='self-start'>
-  //         <DarkModeToggle/>
-  //       </div>
-  //     </nav>
-  //     {isNavOpen && <div className="fixed inset-0 bg-black opacity-50 z-40 md:hidden" onClick={toggleNav}></div>}
-  //     <main className="flex-grow p-5 overflow-y-auto mt-12 md:mt-0">
-  //       <Outlet />
-  //     </main>
-  //   </div>
-  // );
+  
   return (
     <div
       className={`flex h-screen bg-gray-100 dark:bg-gray-950 ${isNavOpen ? "overflow-hidden" : ""

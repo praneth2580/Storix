@@ -39,6 +39,12 @@ export function Toggle({
     lg: { circle: "h-6 w-6", track: "h-8 w-16" }
   };
 
+  const translateAsPerSize = {
+    sm: "translate-x-5",
+    md: "translate-x-6",
+    lg: "translate-x-8"
+  }
+
   return (
     <button
       type="button"
@@ -62,7 +68,7 @@ export function Toggle({
           className={`
             ${sizes[size].circle}
             rounded-full bg-white shadow-md transform transition-transform duration-300
-            ${isOn ? "translate-x-6" : "translate-x-0"}
+            ${isOn ? translateAsPerSize[size] : "translate-x-0"}
           `}
         />
       </div>

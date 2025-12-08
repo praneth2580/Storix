@@ -86,15 +86,15 @@ const ProductPage = () => {
     ];
 
     const productFormFields: FormField<Product>[] = [
-        { name: 'name', label: 'Product Name', type: 'text' },
-        { name: 'category', label: 'Category', type: 'select', options: formatOptions(['Electronics', 'Furniture', 'Kitchenware', 'Stationery']) },
-        { name: 'description', label: 'Description', type: 'text' },
-        { name: 'type', label: 'Type', type: 'select', options: formatOptions(['simple', 'measured', 'variant']) },
-        { name: 'hasVariants', label: 'Has Variants', type: 'radio', options: [{ label: 'True', value: 'true' }, { label: 'False', value: 'false' }] },
-        { name: 'barcode', label: 'Barcode', type: 'text' },
-        { name: 'baseUnit', label: 'Base Unit', type: 'text' },
-        { name: 'defaultCostPrice', label: 'Default Cost Price', type: 'number' },
-        { name: 'defaultSellingPrice', label: 'Default Selling Price', type: 'number' }
+        { name: 'name', label: 'Product Name', required: true, type: 'text' },
+        { name: 'category', label: 'Category', required: true, type: 'select', options: formatOptions(['Electronics', 'Furniture', 'Kitchenware', 'Stationery']) },
+        { name: 'description', label: 'Description', required: true, type: 'text' },
+        { name: 'type', label: 'Type', type: 'select', required: true, options: formatOptions(['simple', 'measured', 'variant']) },
+        { name: 'hasVariants', label: 'Has Variants', type: 'radio', required: true, options: [{ label: 'True', value: 'true' }, { label: 'False', value: 'false' }] },
+        { name: 'barcode', label: 'Barcode', required: false, type: 'text' },
+        { name: 'baseUnit', label: 'Base Unit', required: true, type: 'text' },
+        { name: 'defaultCostPrice', label: 'Default Cost Price', required: true, type: 'number' },
+        { name: 'defaultSellingPrice', label: 'Default Selling Price', required: true, type: 'number' }
     ];
 
     const handleAddProduct = async (formData: Partial<IProduct>) => {
@@ -311,10 +311,10 @@ const VariantsPage = ({ product_id }: { product_id: string }) => {
     ];
 
     const variantFormFields: FormField<Variant>[] = [
-        { name: 'sku', label: 'SKU', type: 'text' },
-        { name: 'attributes', label: 'Attributes', type: 'json' },
-        { name: 'costPrice', label: 'Cost Price', type: 'number' },
-        { name: 'sellingPrice', label: 'Selling Price', type: 'number' },
+        { name: 'sku', label: 'SKU', required: true, type: 'text' },
+        { name: 'attributes', label: 'Attributes', required: true, type: 'json' },
+        { name: 'costPrice', label: 'Cost Price', required: true, type: 'number' },
+        { name: 'sellingPrice', label: 'Selling Price', required: true, type: 'number' },
     ];
 
     const handleAddProduct = async (formData: Partial<IVariant>) => {

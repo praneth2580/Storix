@@ -1,39 +1,72 @@
 /**
- * @file This file contains CRUD functions for the Purchase model.
- * These functions interact with a Google Apps Script backend.
+ * @file CRUD functions for Purchase model using Google Apps Script GET API
  */
 import type { IPurchase } from '../types/models';
-import { jsonpRequest, SCRIPT_URL } from '../utils';
+import { jsonpRequest } from '../utils';
 
-export const getPurchases = async (params: Record<string, string> = {}): Promise<IPurchase[]> => {
-  return jsonpRequest<IPurchase>("Purchases", params);
-};
-
-export const createPurchase = async (purchase: Omit<IPurchase, 'id' | 'date'>): Promise<IPurchase> => {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheet: 'Purchases', ...purchase }),
+/**
+ * GET Purchases (with optional filters)
+ */
+export const getPurchases = async (
+  params: Record<string, string> = {}
+): Promise<IPurchase[]> => {
+  return jsonpRequest<IPurchase>('Purchases', {
+    action: "get",
+    ...params,
   });
-  if (!response.ok) throw new Error('Failed to create purchase');
-  const { data } = await response.json();
-  return data as IPurchase;
 };
 
-export const updatePurchase = async (purchase: Partial<IPurchase> & { id: string }): Promise<IPurchase> => {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheet: 'Purchases', ...purchase }),
+
+/**
+ * CREATE Purchase  
+ * Uses action=create  
+ * Sends ?action=create&sheet=Purchases&data={}
+ */
+export const createPurchase = async (
+  purchase: Omit<IPurchase, 'id' | 'date' | 'createdAt' | 'updatedAt'>
+): Promise<{ id: string }> => {
+
+  const result = await jsonpRequest<{ id: string }>('Purchases', {
+    action: "create",
+    data: JSON.stringify(purchase),
   });
-  if (!response.ok) throw new Error('Failed to update purchase');
-  const { data } = await response.json();
-  return data as IPurchase;
+
+  return result[0]; // API always returns array
 };
 
-export const deletePurchase = async (id: string): Promise<{ success: boolean }> => {
-  const query = new URLSearchParams({ sheet: 'Purchases', id }).toString();
-  const response = await fetch(`${SCRIPT_URL}?${query}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error('Failed to delete purchase');
-  return await response.json();
+
+/**
+ * UPDATE Purchase  
+ * Uses action=update&id=123&data={}
+ */
+export const updatePurchase = async (
+  purchase: Partial<IPurchase> & { id: string }
+): Promise<{ status: string }> => {
+
+  const { id, ...rest } = purchase;
+
+  const result = await jsonpRequest<{ status: string }>('Purchases', {
+    action: "update",
+    id,
+    data: JSON.stringify(rest),
+  });
+
+  return result[0];
+};
+
+
+/**
+ * DELETE Purchase  
+ * Uses action=delete&id=123
+ */
+export const deletePurchase = async (
+  id: string
+): Promise<{ status: string }> => {
+
+  const result = await jsonpRequest<{ status: string }>('Purchases', {
+    action: "delete",
+    id,
+  });
+
+  return result[0];
 };

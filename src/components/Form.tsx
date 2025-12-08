@@ -17,6 +17,7 @@ export interface FormField<T> {
   label: string;
   type: "text" | "number" | "select" | "radio" | "phone" | "email" | "json";
   options?: OptionData[];
+  required: boolean;
   dependsOn?: keyof T;
   getOptions?: (
     value: unknown,
@@ -120,6 +121,7 @@ const Form = <T extends object>({
             name={key}
             value={String(formData[key] ?? "")}
             onChange={handleChange}
+            required={field.required}
             className="
             p-3 rounded-lg w-full
             border border-gray-300 dark:border-gray-700
@@ -147,6 +149,7 @@ const Form = <T extends object>({
             type={field.type}
             value={String(formData[key] ?? "")}
             onChange={handleChange}
+            required={field.required}
             className="
             p-3 rounded-lg w-full
             border border-gray-300 dark:border-gray-700
@@ -169,6 +172,7 @@ const Form = <T extends object>({
                   value={opt.value}
                   checked={formData[key] === opt.value}
                   onChange={handleChange}
+                  required={field.required}
                   className="accent-blue-500"
                 />
                 <label
@@ -190,6 +194,7 @@ const Form = <T extends object>({
             type="text"
             value={String(formData[key] ?? "")}
             onChange={handlePhoneChange}
+            required={field.required}
             className="
             p-3 rounded-lg w-full
             border border-gray-300 dark:border-gray-700
@@ -208,6 +213,7 @@ const Form = <T extends object>({
             type="email"
             value={String(formData[key] ?? "")}
             onChange={handleEmailChange}
+            required={field.required}
             className="
             p-3 rounded-lg w-full
             border border-gray-300 dark:border-gray-700

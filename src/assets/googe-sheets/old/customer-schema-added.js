@@ -1,5 +1,5 @@
 /**
- * SINGLE-ENDPOINT INVENTORY API (+ ORDERS + BATCH API)
+ * SINGLE-ENDPOINT INVENTORY API
  * CRUD handled through GET using "action" param
  */
 
@@ -31,19 +31,10 @@ const SCHEMAS = {
     StockMovements: [
         'id', 'variantId', 'change', 'unit', 'type', 'refId', 'createdAt'
     ],
-    
-    /** NEW — ORDER HEADER TABLE */
-    Orders: [
-        'id', 'customerId', 'totalAmount', 'paymentMethod',
-        'date', 'notes', 'createdAt'
-    ],
-
-    /** UPDATED — SALES NOW SUPPORT MULTIPLE ITEMS PER ORDER */
     Sales: [
-        'id', 'orderId', 'variantId', 'quantity', 'unit',
+        'id', 'variantId', 'quantity', 'unit',
         'sellingPrice', 'total', 'date', 'customerId', 'paymentMethod'
     ],
-
     Purchases: [
         'id', 'variantId', 'supplierId', 'quantity', 'unit',
         'costPrice', 'total', 'date', 'invoiceNumber'
@@ -58,9 +49,8 @@ const SCHEMAS = {
     ]
 };
 
-
 // ------------------------------------------------------
-// Load or Create Sheet
+// Load / Create Sheet
 // ------------------------------------------------------
 function getOrCreateSheet(sheetName) {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -75,48 +65,29 @@ function getOrCreateSheet(sheetName) {
     return sheet;
 }
 
-
 // ------------------------------------------------------
 // MAIN ENTRY
 // ------------------------------------------------------
 function doGet(e) {
     const action = e.parameter.action || "get";
     const sheetName = e.parameter.sheet || DEFAULT_SHEET;
+    const sheet = getOrCreateSheet(sheetName);
 
     let response;
 
     switch (action) {
-        case "get":
-            response = handleGet(e, getOrCreateSheet(sheetName), sheetName);
-            break;
-
-        case "create":
-            response = handleCreate(e, getOrCreateSheet(sheetName), sheetName);
-            break;
-
-        case "update":
-            response = handleUpdate(e, getOrCreateSheet(sheetName), sheetName);
-            break;
-
-        case "delete":
-            response = handleDelete(e, getOrCreateSheet(sheetName));
-            break;
-
-        case "batch":
-            response = handleBatch(e);
-            break;
-
-        default:
-            response = { error: "Invalid action" };
+        case "get": response = handleGet(e, sheet, sheetName); break;
+        case "create": response = handleCreate(e, sheet, sheetName); break;
+        case "update": response = handleUpdate(e, sheet, sheetName); break;
+        case "delete": response = handleDelete(e, sheet, sheetName); break;
+        default: response = { error: "Invalid action" };
     }
 
     return respondJSONP(response, e);
 }
 
-
-
 // ------------------------------------------------------
-// FOREIGN KEY MAPS
+// FOREIGN KEY CACHE (optimized merged version)
 // ------------------------------------------------------
 function getFKMaps() {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -132,50 +103,60 @@ function getFKMaps() {
         return map;
     };
 
+    const productMap = readSheet("Products");
+    const variantMap = readSheet("Variants");
+    const customerMap = readSheet("Customers");  // ← NEW
+
     return {
-        productObjMap: readSheet("Products"),
-        variantObjMap: readSheet("Variants"),
-        customerObjMap: readSheet("Customers")
+        productObjMap: productMap,
+        variantObjMap: variantMap,
+        customerObjMap: customerMap   // ← NEW
     };
 }
 
 
-
 // ------------------------------------------------------
-// ENRICH FOREIGN KEYS
+// ENRICH FOREIGN KEYS (merged + fixed)
 // ------------------------------------------------------
 function enrichRow(row, sheetName, fk) {
-    const enriched = { ...row };
+  const enriched = { ...row };
 
-    if (sheetName === "Variants") {
-        const product = fk.productObjMap[row.productId];
-        enriched.product = product || null;
-        enriched.productName = product?.name || "";
-    }
+  // --- VARIANTS ---
+  if (sheetName === "Variants") {
+    const product = fk.productObjMap[row.productId];
+    enriched.product = product || null;
+    enriched.productName = product?.name || "";
+  }
 
-    if (sheetName === "Stock") {
-        const variant = fk.variantObjMap[row.variantId];
-        const product = fk.productObjMap[variant?.productId];
-        enriched.variant = variant || null;
-        enriched.product = product || null;
-        enriched.productName = product?.name || "";
-    }
+  // --- STOCK ---
+  if (sheetName === "Stock") {
+    const variant = fk.variantObjMap[row.variantId];
+    const product = fk.productObjMap[variant?.productId];
+    enriched.variant = variant || null;
+    enriched.variantSku = variant?.sku || "";
+    enriched.product = product || null;
+    enriched.productName = product?.name || "";
+  }
 
-    if (sheetName === "Sales") {
-        const variant = fk.variantObjMap[row.variantId];
-        const product = fk.productObjMap[variant?.productId];
-        const customer = fk.customerObjMap[row.customerId];
+  // --- SALES / PURCHASES ---
+  if (sheetName === "Sales" || sheetName === "Purchases") {
+    const variant = fk.variantObjMap[row.variantId];
+    const product = fk.productObjMap[variant?.productId];
+    enriched.variant = variant || null;
+    enriched.variantSku = variant?.sku || "";
+    enriched.productId = product?.id || "";
+    enriched.productName = product?.name || "";
+  }
 
-        enriched.variant = variant || null;
-        enriched.product = product || null;
-        enriched.productName = product?.name || "";
-        enriched.customer = customer || null;
-        enriched.customerName = customer?.name || "";
-    }
+  // --- CUSTOMERS FOR SALES ---
+  if (sheetName === "Sales") {
+    const customer = fk.customerObjMap[row.customerId];
+    enriched.customer = customer || null;
+    enriched.customerName = customer?.name || "";
+  }
 
-    return enriched;
+  return enriched;
 }
-
 
 
 // ------------------------------------------------------
@@ -207,10 +188,8 @@ function handleGet(e, sheet, sheetName) {
         : rows;
 }
 
-
-
 // ------------------------------------------------------
-// CREATE handler
+// CREATE
 // ------------------------------------------------------
 function handleCreate(e, sheet, sheetName) {
     if (!e.parameter.data) return { error: "Missing data payload" };
@@ -234,10 +213,8 @@ function handleCreate(e, sheet, sheetName) {
     return { status: "success", id: data.id, sheet: sheetName };
 }
 
-
-
 // ------------------------------------------------------
-// UPDATE handler
+// UPDATE
 // ------------------------------------------------------
 function handleUpdate(e, sheet, sheetName) {
     if (!e.parameter.id) return { error: "Missing id" };
@@ -265,10 +242,8 @@ function handleUpdate(e, sheet, sheetName) {
     return { error: "ID not found", sheet: sheetName };
 }
 
-
-
 // ------------------------------------------------------
-// DELETE handler
+// DELETE
 // ------------------------------------------------------
 function handleDelete(e, sheet) {
     if (!e.parameter.id) return { error: "Missing id" };
@@ -285,120 +260,6 @@ function handleDelete(e, sheet) {
 
     return { error: "ID not found" };
 }
-
-
-
-// ------------------------------------------------------
-// BATCH API (create/update/delete multiple rows across sheets)
-// ------------------------------------------------------
-
-function handleBatch(e) {
-    if (!e.parameter.data)
-        return { error: "Missing batch payload" };
-
-    let payload;
-    try {
-        payload = JSON.parse(e.parameter.data);
-    } catch (err) {
-        return { error: "Invalid JSON" };
-    }
-
-    if (!payload.operations || !Array.isArray(payload.operations))
-        return { error: "Missing operations[]" };
-
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const results = [];
-
-    payload.operations.forEach((op, index) => {
-        try {
-            const sheet = getOrCreateSheet(op.sheet);
-            const action = op.type.toLowerCase();
-
-            // --- Create ---
-            if (action === "create") {
-                const headers = SCHEMAS[op.sheet];
-                const lastRow = sheet.getLastRow();
-                const nextId = lastRow >= 2
-                    ? Number(sheet.getRange(lastRow, 1).getValue()) + 1
-                    : 1;
-
-                const now = new Date().toISOString();
-                op.data.id = op.data.id || String(nextId);
-
-                if (headers.includes("createdAt")) op.data.createdAt = now;
-                if (headers.includes("updatedAt")) op.data.updatedAt = now;
-
-                sheet.appendRow(headers.map(h => op.data[h] ?? ""));
-
-                results.push({
-                    index,
-                    status: "created",
-                    sheet: op.sheet,
-                    id: op.data.id
-                });
-
-            }
-
-            // --- Update ---
-            else if (action === "update") {
-                const id = String(op.id);
-                const data = sheet.getDataRange().getValues();
-                const headers = data.shift();
-                const now = new Date().toISOString();
-
-                let updated = false;
-                for (let i = 0; i < data.length; i++) {
-                    if (String(data[i][0]) === id) {
-                        headers.forEach((h, j) => {
-                            if (h === "updatedAt")
-                                sheet.getRange(i + 2, j + 1).setValue(now);
-                            else if (op.data[h] !== undefined)
-                                sheet.getRange(i + 2, j + 1).setValue(op.data[h]);
-                        });
-                        updated = true;
-                        break;
-                    }
-                }
-
-                results.push(updated
-                    ? { index, status: "updated", sheet: op.sheet, id }
-                    : { index, error: "ID not found", sheet: op.sheet }
-                );
-            }
-
-            // --- Delete ---
-            else if (action === "delete") {
-                const id = String(op.id);
-                const data = sheet.getDataRange().getValues();
-
-                let deleted = false;
-                for (let i = 1; i < data.length; i++) {
-                    if (String(data[i][0]) === id) {
-                        sheet.deleteRow(i + 1);
-                        deleted = true;
-                        break;
-                    }
-                }
-
-                results.push(deleted
-                    ? { index, status: "deleted", sheet: op.sheet, id }
-                    : { index, error: "ID not found", sheet: op.sheet }
-                );
-            }
-
-            else {
-                results.push({ index, error: "Invalid action type" });
-            }
-
-        } catch (err) {
-            results.push({ index, error: err.message });
-        }
-    });
-
-    return { status: "completed", results };
-}
-
-
 
 // ------------------------------------------------------
 // JSON / JSONP Response
@@ -421,4 +282,3 @@ function respondJSONP(data, e) {
     return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
 }
-

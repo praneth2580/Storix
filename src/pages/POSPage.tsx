@@ -5,14 +5,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DarkModeToggle from "../components/DarkModeToggle";
 import { getVariants } from "../models/variants";
-import { Customer, Variant } from "../types/models";
+import { Customer, Variant, type ICustomer } from "../types/models";
 import Loader from "../components/Loader";
 import { motion, AnimatePresence } from "framer-motion";
 import CountHandler from "../components/CountHandler";
 import Modal from "../components/Modal";
 import Form, { type FormField } from "../components/Form";
 import AutoCompleteSearch from "../components/AutoCompleteSearch";
-import { getCustomers } from "../models/customers";
+import { createCustomer, getCustomers, updateCustomer } from "../models/customers";
+import { Toggle } from "../components/Toggle";
+import { createBatchOrder } from "../models/order";
 
 /** Local cart item */
 type CartItem = Partial<Variant> & { count: number };
@@ -26,6 +28,9 @@ const POSPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [activeCategory, setActiveCategory] = useState<string>("All");
     const [cart, setCart] = useState<CartItem[]>([]);
+    const [customerModalOpen, setCustomerModalOpen] = useState<boolean>(false);
+    const [chosenCustomer, setChosenCustomer] = useState<Customer>();
+    const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
     const [cartOpen, setCartOpen] = useState<boolean>(false);
     const [isLargeScreen, setIsLargeScreen] = useState<boolean>(false);
 
@@ -279,7 +284,7 @@ const POSPage: React.FC = () => {
                                             {!inCart ? (
                                                 <button
                                                     onClick={() => addToCart(variant)}
-                                                    className="w-full py-2 rounded-lg bg-blue-500 text-white font-medium"
+                                                    className="w-full py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition"
                                                 >
                                                     Add
                                                 </button>
@@ -388,7 +393,14 @@ const POSPage: React.FC = () => {
                                     <span>₹{total.toFixed(2)}</span>
                                 </div>
 
-                                <button className="w-full mt-4 py-3 rounded-xl bg-blue-600 text-white font-semibold cursor-pointer">
+                                <button disabled={cart.length === 0} onClick={() => setCustomerModalOpen(true)} className="
+                                    w-full mt-4 py-3 rounded-xl
+                                    bg-blue-600 text-white font-semibold
+                                    hover:bg-blue-700
+                                    disabled:bg-gray-400 disabled:text-gray-200
+                                    disabled:cursor-not-allowed
+                                    transition
+                                ">
                                     Checkout
                                 </button>
                             </div>
@@ -405,7 +417,7 @@ const POSPage: React.FC = () => {
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
                         transition={{ type: "tween", duration: 0.25 }}
-                        className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm z-10"
                         onClick={() => setCartOpen(false)} // click outside closes
                     >
                         <motion.div
@@ -496,7 +508,17 @@ const POSPage: React.FC = () => {
                                     <span>₹{total.toFixed(2)}</span>
                                 </div>
 
-                                <button className="w-full mt-4 py-3 rounded-xl bg-blue-600 text-white font-semibold">
+                                <button onClick={() => {
+                                    setCustomerModalOpen(true);
+                                    setCartOpen(false);
+                                }} disabled={cart.length === 0} className="
+                                    w-full mt-4 py-3 rounded-xl
+                                    bg-blue-600 text-white font-semibold
+                                    hover:bg-blue-700
+                                    disabled:bg-gray-400 disabled:text-gray-200
+                                    disabled:cursor-not-allowed
+                                    transition
+                                ">
                                     Checkout
                                 </button>
                             </div>
@@ -507,23 +529,47 @@ const POSPage: React.FC = () => {
 
             {error && <div className="fixed bottom-6 right-6 bg-red-600 text-white px-5 py-3 rounded-lg shadow-lg">{error}</div>}
 
-            <CustomerModal show={true} onClose={() => { }} />
+            <CustomerModal
+                show={customerModalOpen}
+                chosenCustomer={customer => {
+                    setChosenCustomer(customer);
+                    setPaymentModalOpen(true);
+                }}
+                onClose={() => setCustomerModalOpen(false)} />
+
+            <PaymentModal
+                show={paymentModalOpen}
+                customer={chosenCustomer ?? new Customer({
+                    id: '',
+                    name: '',
+                    phone: '',
+                    email: '',
+                    address: '',
+                    notes: '',
+                    gstNumber: '',
+                    outstandingBalance: 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                })}
+                cart={cart}
+                onClose={() => setPaymentModalOpen(false)} />
         </div>
     );
 };
 
-const CustomerModal: React.FC = ({ show, onClose }: { show: boolean; onClose: () => void }) => {
+const CustomerModal = ({ show, onClose, chosenCustomer }: { show: boolean; onClose: () => void; chosenCustomer: (customer: Customer) => void }) => {
 
     const [customers, setCustomers] = useState<Customer[]>();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer>();
     const [loading, setLoading] = useState<boolean>(true);
+    const [key, setKey] = useState<number>(0);
     const customerFormFields: FormField<Customer>[] = [
-        { name: 'name', label: 'Name', type: 'text' },
-        { name: 'phone', label: 'Phone', type: 'phone' },
-        { name: 'email', label: 'Email', type: 'email' },
-        { name: 'address', label: 'Address', type: 'text' },
-        { name: 'notes', label: 'Notes', type: 'text' },
-        { name: 'gstNumber', label: 'GST No', type: 'text' },
+        { name: 'name', label: 'Name', required: true, type: 'text' },
+        { name: 'phone', label: 'Phone', required: true, type: 'phone' },
+        { name: 'email', label: 'Email', required: false, type: 'email' },
+        { name: 'address', label: 'Address', required: false, type: 'text' },
+        { name: 'notes', label: 'Notes', required: false, type: 'text' },
+        { name: 'gstNumber', label: 'GST No', required: false, type: 'text' },
         // { name: 'outstandingBalance', label: 'Outstanding Balance', type: 'number' },
     ];
 
@@ -540,11 +586,56 @@ const CustomerModal: React.FC = ({ show, onClose }: { show: boolean; onClose: ()
         }
     };
 
-    useEffect(() => {
-        loadCustomers();
-    }, []);
+    const handleCustomerSubmit = async (formData: Partial<ICustomer>) => {
+        if (selectedCustomer) {
+            const data = {
+                id: selectedCustomer.id,
+                name: formData.name ?? '',
+                phone: formData.phone ?? '',
+                email: formData.email ?? '',
+                address: formData.address ?? '',
+                notes: formData.notes ?? '',
+                gstNumber: formData.gstNumber ?? '',
+                outstandingBalance: selectedCustomer.outstandingBalance || 0,
+                createdAt: selectedCustomer.createdAt,
+                updatedAt: new Date().toISOString()
+            };
 
-    console.log("selectedCustomer: ", selectedCustomer)
+            await updateCustomer(data);
+            chosenCustomer(new Customer(data));
+
+        } else {
+            const data = {
+                name: formData.name ?? '',
+                phone: formData.phone ?? '',
+                email: formData.email ?? '',
+                address: formData.address ?? '',
+                notes: formData.notes ?? '',
+                gstNumber: formData.gstNumber ?? '',
+                outstandingBalance: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            const reslt = await createCustomer(data);
+
+            chosenCustomer(new Customer({
+                "id": reslt["id"],
+                ...data
+            }));
+        }
+    }
+
+    useEffect(() => {
+        setKey(key + 1);
+    }, [selectedCustomer]);
+
+    useEffect(() => {
+        if (!show) return;
+        loadCustomers();
+        setSelectedCustomer(undefined);
+    }, [show]);
+
 
     return <Modal show={show} size="xl" title="Customer Details" onClose={onClose}>
 
@@ -560,7 +651,7 @@ const CustomerModal: React.FC = ({ show, onClose }: { show: boolean; onClose: ()
             <AutoCompleteSearch<Customer>
                 id="auto-complete-customer-search"
                 name="auto-complete-customer-search"
-                value={selectedCustomer}
+                value=""
                 options={customers ?? []}
                 key="phone"
                 searchKeys={["name", "phone", 'email']}
@@ -576,16 +667,17 @@ const CustomerModal: React.FC = ({ show, onClose }: { show: boolean; onClose: ()
             />
         </div>
 
-        <div className="flex flex-row gap-2 justify-center items-center my-5">
-            <div className="border-bottom border-1 w-[calc(50%-14rem)] border-gray-200 dark:border-gray-700 my-5 ms-auto me-2 align-end"></div>
-            <p>OR</p>
-            <div className="border-bottom border-1 w-[calc(50%-14rem)] border-gray-200 dark:border-gray-700 my-5 me-auto ms-2 align-start"></div>
+        <div className="flex flex-row gap-2 justify-center items-center my-3">
+            <div className="border-bottom border-1 w-[calc(50%-10rem)] border-gray-200 dark:border-gray-700 my-5 ms-auto me-2 align-end"></div>
+            <p className="font-bold text-md mx-5">OR</p>
+            <div className="border-bottom border-1 w-[calc(50%-10rem)] border-gray-200 dark:border-gray-700 my-5 me-auto ms-2 align-start"></div>
         </div>
 
         <Form<Customer>
+            key={key}
             fields={customerFormFields}
-            onSubmit={() => { }}
-            onClose={() => { }}
+            onSubmit={handleCustomerSubmit}
+            onClose={onClose}
             initialData={selectedCustomer ? selectedCustomer : new Customer({
                 id: '',
                 name: '',
@@ -598,6 +690,187 @@ const CustomerModal: React.FC = ({ show, onClose }: { show: boolean; onClose: ()
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             })} />
+    </Modal>
+}
+
+const PaymentModal = ({ show, onClose, customer, cart }: { show: boolean; onClose: () => void, customer: Customer, cart: CartItem[] }) => {
+
+
+    const totalItems = useMemo(
+        () => cart.reduce((a, b) => a + b.count, 0),
+        [cart]
+    );
+
+    const subtotal = useMemo(
+        () => cart.reduce((s, i) => s + (i.sellingPrice || 0) * i.count, 0),
+        [cart]
+    );
+
+    const taxRate = 0.18;
+    const totalTax = subtotal * taxRate;
+    const total = subtotal + totalTax;
+
+    const totalOutStanding = customer.outstandingBalance + total;
+
+    const [loading, setLoading] = useState<boolean>(true);
+    const [fullPayment, setFullPayment] = useState<boolean>(false);
+    const [fullOutstandingPayment, setFullOutstandingPayment] = useState<boolean>(false);
+    const [totalPaymentAmount, setTotalPaymentAmount] = useState(totalOutStanding);
+    const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "upi" | "cheque" | "other" | "none" | "bank">('cash');
+    const paymentMethodOptions = [
+        { label: "Cash", value: "cash" },
+        { label: "Card", value: "card" },
+        { label: "Cheque", value: "cheque" },
+        { label: "UPI", value: "upi" },
+        { label: "Bank Transfer", value: "bank" },
+        { label: "Other", value: "other" },
+        { label: "No Payment", value: "none" },
+    ]
+
+    const handlePaymentProceed = async () => {
+        try {
+
+            const order = {
+                customerId: customer.id,
+                totalAmount: totalPaymentAmount,
+                paymentMethod: paymentMethod,
+                notes: ""
+            }
+
+            const items = cart.map(c => ({
+                "variantId": c.id ?? '', 
+                "quantity": c.count ?? 0,
+                "unit": c.product?.baseUnit ?? '',
+                "sellingPrice": c.sellingPrice ?? 0,
+                "total": c.sellingPrice ?? 0,
+                "customerId": customer.id,
+                "paymentMethod": paymentMethod
+            }));
+
+            await createBatchOrder(order, items);
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    useEffect(() => {
+        if (!show) return;
+        setTotalPaymentAmount(totalOutStanding);
+        setLoading(false);
+    }, [show])
+
+    useEffect(() => {
+        if (paymentMethod === 'none') {
+            setTotalPaymentAmount(0);
+        } else if (fullOutstandingPayment) {
+            setTotalPaymentAmount(totalOutStanding);
+        } else if (fullPayment) {
+            setTotalPaymentAmount(total);
+        }
+    }, [fullPayment, fullOutstandingPayment, paymentMethod])
+
+
+    return <Modal show={show} size="xl" title="Payment Details" onClose={onClose}>
+
+        <Loader loading={loading} />
+
+        <div className="px-2 py-3 flex flex-row gap-4">
+            <div className="flex flex-col flex-1">
+                <label htmlFor="totalPaymentAmount" className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Total Amount Payed</label>
+                <input
+                    id="totalPaymentAmount"
+                    type="number"
+                    value={totalPaymentAmount}
+                    onChange={(e) => setTotalPaymentAmount(parseFloat(e.target.value))}
+                    disabled={fullPayment || fullOutstandingPayment || paymentMethod === 'none'}
+                    required
+                    className="
+                        p-3 rounded-lg w-full
+                        border border-gray-300 dark:border-gray-700
+                        bg-white dark:bg-gray-800
+                        text-gray-900 dark:text-gray-200
+                        focus:outline-none focus:ring-2 focus:ring-blue-500
+                    "
+                />
+            </div>
+            <div className="flex flex-col">
+                <label className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Full Payment</label>
+                <div className="h-full flex items-center justify-center">
+                    <Toggle
+                        checked={fullPayment}
+                        onChange={(value) => setFullPayment(value)}
+                        disabled={fullOutstandingPayment || paymentMethod === 'none'}
+                        size="lg"
+                    />
+                </div>
+            </div>
+            <div className="flex flex-col">
+                <label className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Full Outstanding Payment</label>
+                <div className="h-full flex items-center justify-center">
+                    <Toggle
+                        checked={fullOutstandingPayment}
+                        onChange={(value) => setFullOutstandingPayment(value)}
+                        disabled={fullPayment || paymentMethod === 'none'}
+                        size="lg"
+                    />
+                </div>
+            </div>
+        </div>
+        <div className="my-4 ms-2">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {paymentMethodOptions.map(payMethod => <button
+                    key={payMethod.value}
+                    onClick={() => setPaymentMethod(payMethod.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium flex-shrink-0 ${paymentMethod === payMethod.value
+                        ? "text-white bg-blue-500 dark:bg-blue-600"
+                        : "bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700"
+                        }`}
+                >
+                    {payMethod.label}
+                </button>)}
+            </div>
+        </div>
+        <div>
+            {/* TOTALS */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-inner">
+                <div className="flex justify-between mb-2 text-sm">
+                    <span className="text-gray-600">Items ({totalItems}) + Tax ({taxRate * 100}%)</span>
+                    <span>₹{total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-2 text-sm">
+                    <span className="text-gray-600">Outstanding</span>
+                    <span>₹{customer.outstandingBalance.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between font-bold text-lg mt-4">
+                    <span>Total</span>
+                    <span>₹{totalPaymentAmount.toFixed(2)}</span>
+                </div>
+
+                {totalPaymentAmount < totalOutStanding && <div className="flex justify-between font-bold text-red-400 text-sm mt-4">
+                    <span>Outstanding Amount [ - ]</span>
+                    <span>₹{(totalOutStanding - totalPaymentAmount).toFixed(2)}</span>
+                </div>}
+
+                {totalPaymentAmount > totalOutStanding && <div className="flex justify-between font-bold text-green-400 text-sm mt-4">
+                    <span>Outstanding Amount [ + ]</span>
+                    <span>₹{(totalPaymentAmount - totalOutStanding).toFixed(2)}</span>
+                </div>}
+
+                <button disabled={cart.length === 0} onClick={handlePaymentProceed} className="
+                    w-full mt-4 py-3 rounded-xl
+                    bg-blue-600 text-white font-semibold
+                    hover:bg-blue-700
+                    disabled:bg-gray-400 disabled:text-gray-200
+                    disabled:cursor-not-allowed
+                    transition
+                ">
+                    Proceed
+                </button>
+            </div>
+        </div>
+
     </Modal>
 }
 

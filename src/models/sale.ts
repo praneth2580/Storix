@@ -1,39 +1,73 @@
 /**
- * @file This file contains CRUD functions for the Sale model.
- * These functions interact with a Google Apps Script backend.
+ * @file CRUD functions for Sale model using Google Apps Script GET API
  */
 import type { ISale } from '../types/models';
-import { jsonpRequest, SCRIPT_URL } from '../utils';
+import { jsonpRequest } from '../utils';
 
-export const getSales = async (params: Record<string, string> = {}): Promise<ISale[]> => {
-  return jsonpRequest<ISale>("Sales", params);
-};
 
-export const createSale = async (sale: Omit<ISale, 'id' | 'date'>): Promise<ISale> => {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheet: 'Sales', ...sale }),
+/**
+ * GET Sales (with optional filters)
+ */
+export const getSales = async (
+  params: Record<string, string> = {}
+): Promise<ISale[]> => {
+  return jsonpRequest<ISale>('Sales', {
+    action: "get",
+    ...params,
   });
-  if (!response.ok) throw new Error('Failed to create sale');
-  const { data } = await response.json();
-  return data as ISale;
 };
 
-export const updateSale = async (sale: Partial<ISale> & { id: string }): Promise<ISale> => {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheet: 'Sales', ...sale }),
+
+/**
+ * CREATE Sale  
+ * Uses action=create  
+ * Sends ?action=create&sheet=Sales&data={}
+ */
+export const createSale = async (
+  sale: Omit<ISale, 'id' | 'date' | 'createdAt' | 'updatedAt'>
+): Promise<{ id: string }> => {
+
+  const result = await jsonpRequest<{ id: string }>('Sales', {
+    action: "create",
+    data: JSON.stringify(sale),
   });
-  if (!response.ok) throw new Error('Failed to update sale');
-  const { data } = await response.json();
-  return data as ISale;
+
+  return result[0];
 };
 
-export const deleteSale = async (id: string): Promise<{ success: boolean }> => {
-  const query = new URLSearchParams({ sheet: 'Sales', id }).toString();
-  const response = await fetch(`${SCRIPT_URL}?${query}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error('Failed to delete sale');
-  return await response.json();
+
+/**
+ * UPDATE Sale  
+ * Uses action=update&id=123&data={}
+ */
+export const updateSale = async (
+  sale: Partial<ISale> & { id: string }
+): Promise<{ status: string }> => {
+
+  const { id, ...rest } = sale;
+
+  const result = await jsonpRequest<{ status: string }>('Sales', {
+    action: "update",
+    id,
+    data: JSON.stringify(rest),
+  });
+
+  return result[0];
+};
+
+
+/**
+ * DELETE Sale  
+ * Uses action=delete&id=123
+ */
+export const deleteSale = async (
+  id: string
+): Promise<{ status: string }> => {
+
+  const result = await jsonpRequest<{ status: string }>('Sales', {
+    action: "delete",
+    id,
+  });
+
+  return result[0];
 };

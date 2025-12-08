@@ -80,14 +80,29 @@ export interface IStock {
   updatedAt: string;
 }
 
+// 🧾 Order
+export interface IOrder {
+  id: string;
+
+  customerId?: string;
+  totalAmount: number;
+  paymentMethod?: "cash" | "card" | "upi" | "cheque" | "other" | "none" | "bank";
+  
+  date: string;
+  notes: string;
+  createdAt: string;
+
+}
+
 // 🧾 Sale Transaction
 export interface ISale {
   id: string;
 
-  productId: string;
-  variantId?: string | null;
+  orderId: string;
+  variantId: string;
 
   quantity: number;       // units or weight
+  unit: string;
   sellingPrice: number;   // final applied price
   total: number;
 
@@ -95,7 +110,7 @@ export interface ISale {
 
   customerId?: string;
   customer?: ICustomer;
-  paymentMethod?: "cash" | "card" | "upi" | "other";
+  paymentMethod?: "cash" | "card" | "upi" | "cheque" | "other" | "none" | "bank";
 }
 
 // 📥 Purchase / Stock-In
