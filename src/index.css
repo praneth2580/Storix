@@ -28,6 +28,8 @@ select {
         overflow: hidden !important;
     }
 
+    main { overflow: hidden!important; }
+
     #none-printable-invoice {
         display: none;
     }
