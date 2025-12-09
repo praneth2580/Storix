@@ -9,11 +9,13 @@ import SettingsPage from "./pages/SettingsPage";
 import HelpPage from "./pages/HelpPage";
 import AboutPage from "./pages/AboutPage";
 import CustomerPage from "./pages/CustomerPage";
+import InvoicePage from "./pages/InvoicePage";
 
 export interface RouteItem {
   path: string;
   name: string;
   icon: string;
+  hideInSidebar?: boolean;
   component: React.ComponentType;
 }
 
@@ -83,5 +85,12 @@ export const routeConfig: RouteItem[] = [
     name: 'About',
     icon: '/logo.png',
     component: AboutPage,
+  },
+  {
+    path: '/invoice/:OI',
+    name: 'Invoice',
+    icon: '/logo.png',
+    hideInSidebar: true,
+    component: InvoicePage,
   },
 ];

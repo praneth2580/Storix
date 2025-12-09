@@ -535,6 +535,7 @@ const POSPage: React.FC = () => {
                     setChosenCustomer(customer);
                     setPaymentModalOpen(true);
                 }}
+                setLoading={setLoading}
                 onClose={() => setCustomerModalOpen(false)} />
 
             <PaymentModal
@@ -551,17 +552,20 @@ const POSPage: React.FC = () => {
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 })}
+                setLoading={setLoading}
                 cart={cart}
-                onClose={() => setPaymentModalOpen(false)} />
+                onClose={() => setPaymentModalOpen(false)} 
+                onSuccess={() => {
+                    setCart([]);
+                }}/>
         </div>
     );
 };
 
-const CustomerModal = ({ show, onClose, chosenCustomer }: { show: boolean; onClose: () => void; chosenCustomer: (customer: Customer) => void }) => {
+const CustomerModal = ({ show, onClose, chosenCustomer, setLoading }: { show: boolean; onClose: () => void; chosenCustomer: (customer: Customer) => void, setLoading: React.Dispatch<React.SetStateAction<boolean>> }) => {
 
     const [customers, setCustomers] = useState<Customer[]>();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer>();
-    const [loading, setLoading] = useState<boolean>(true);
     const [key, setKey] = useState<number>(0);
     const customerFormFields: FormField<Customer>[] = [
         { name: 'name', label: 'Name', required: true, type: 'text' },
@@ -587,6 +591,7 @@ const CustomerModal = ({ show, onClose, chosenCustomer }: { show: boolean; onClo
     };
 
     const handleCustomerSubmit = async (formData: Partial<ICustomer>) => {
+        setLoading(true);
         if (selectedCustomer) {
             const data = {
                 id: selectedCustomer.id,
@@ -638,8 +643,6 @@ const CustomerModal = ({ show, onClose, chosenCustomer }: { show: boolean; onClo
 
 
     return <Modal show={show} size="xl" title="Customer Details" onClose={onClose}>
-
-        <Loader loading={loading} />
         <div
             className="
                 w-full max-w-5xl mx-auto p-6 rounded-xl
@@ -693,7 +696,7 @@ const CustomerModal = ({ show, onClose, chosenCustomer }: { show: boolean; onClo
     </Modal>
 }
 
-const PaymentModal = ({ show, onClose, customer, cart }: { show: boolean; onClose: () => void, customer: Customer, cart: CartItem[] }) => {
+const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: { show: boolean; onClose: () => void, customer: Customer, cart: CartItem[], setLoading: React.Dispatch<React.SetStateAction<boolean>>, onSuccess: () => void }) => {
 
 
     const totalItems = useMemo(
@@ -712,7 +715,6 @@ const PaymentModal = ({ show, onClose, customer, cart }: { show: boolean; onClos
 
     const totalOutStanding = customer.outstandingBalance + total;
 
-    const [loading, setLoading] = useState<boolean>(true);
     const [fullPayment, setFullPayment] = useState<boolean>(false);
     const [fullOutstandingPayment, setFullOutstandingPayment] = useState<boolean>(false);
     const [totalPaymentAmount, setTotalPaymentAmount] = useState(totalOutStanding);
@@ -729,6 +731,7 @@ const PaymentModal = ({ show, onClose, customer, cart }: { show: boolean; onClos
 
     const handlePaymentProceed = async () => {
         try {
+            setLoading(true);
 
             const order = {
                 customerId: customer.id,
@@ -742,12 +745,17 @@ const PaymentModal = ({ show, onClose, customer, cart }: { show: boolean; onClos
                 "quantity": c.count ?? 0,
                 "unit": c.product?.baseUnit ?? '',
                 "sellingPrice": c.sellingPrice ?? 0,
-                "total": c.sellingPrice ?? 0,
+                "total": (c.sellingPrice ?? 0) * c.count,
                 "customerId": customer.id,
                 "paymentMethod": paymentMethod
             }));
 
-            await createBatchOrder(order, items);
+            const _customer = customer;
+            _customer.outstandingBalance = totalOutStanding - totalPaymentAmount;
+
+            const { orderId } = await createBatchOrder(order, items, _customer, total, totalPaymentAmount);
+            setLoading(false);
+            onSuccess()
 
         } catch (error) {
             console.log(error);
@@ -772,8 +780,6 @@ const PaymentModal = ({ show, onClose, customer, cart }: { show: boolean; onClos
 
 
     return <Modal show={show} size="xl" title="Payment Details" onClose={onClose}>
-
-        <Loader loading={loading} />
 
         <div className="px-2 py-3 flex flex-row gap-4">
             <div className="flex flex-col flex-1">

@@ -6,16 +6,36 @@ import { jsonpRequest } from '../utils';
 
 
 /**
- * GET Sales (with optional filters)
+ * GET Sales (supports multi-value filters)
+ *
+ * Example:
+ * getSales({ variantId: ["4", "8"], paymentMethod: "cash,upi" })
  */
 export const getSales = async (
-  params: Record<string, string> = {}
+  params: Record<string, unknown> = {}
 ): Promise<ISale[]> => {
-  return jsonpRequest<ISale>('Sales', {
-    action: "get",
-    ...params,
+  const queryParams: Record<string, string> = { action: "get" };
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+
+    // Arrays → comma-separated "a,b,c"
+    if (Array.isArray(value)) {
+      queryParams[key] = value.join(",");
+    }
+    // Numbers → toString
+    else if (typeof value === "number") {
+      queryParams[key] = String(value);
+    }
+    // Strings → pass as-is
+    else {
+      queryParams[key] = value;
+    }
   });
+
+  return jsonpRequest<ISale>("Sales", queryParams);
 };
+
 
 
 /**

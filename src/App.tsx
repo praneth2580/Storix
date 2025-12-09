@@ -21,7 +21,7 @@ const Layout = () => {
       <div className="md:hidden flex items-center justify-between p-2 
       bg-white dark:bg-gray-900
       border-b border-gray-200 dark:border-gray-700
-      w-full fixed z-50">
+      w-full fixed z-50" id='mobile-top-nav'>
         <button
           className="text-2xl bg-transparent border-none cursor-pointer text-black dark:text-gray-300"
           onClick={toggleNav}
@@ -50,7 +50,7 @@ const Layout = () => {
 
         {/* Navigation Links */}
         <ul className="list-none p-0 m-0 h-full">
-          {routeConfig.map((route) => (
+          {routeConfig.filter(route => route.hideInSidebar != true).map((route) => (
             <li key={route.path}>
               <NavLink
                 to={route.path}

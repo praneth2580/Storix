@@ -5,6 +5,48 @@ export const SCRIPT_ID = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
 export const SCRIPT_URL = `https://script.google.com/macros/s/${SCRIPT_ID}/exec`;
 
 
+// export function jsonpRequest<T>(
+//   sheet: string,
+//   params: Record<string, string> = {}
+// ): Promise<T[]> {
+//   return new Promise((resolve, reject) => {
+//     if (typeof document === "undefined") {
+//       reject("Not running in a browser environment");
+//       return;
+//     }
+
+//     const callbackName = `jsonp_cb_${Date.now()}_${Math.floor(
+//       Math.random() * 1000
+//     )}`;
+//     (window as any)[callbackName] = (response: any) => {
+//       try {
+//         // console.log(`✅ JSONP Response [${sheet}]`, response);
+//         resolve(Array.isArray(response) ? response : response.data || []);
+//       } catch (err) {
+//         reject(err);
+//       } finally {
+//         delete (window as any)[callbackName];
+//         if (script.parentNode) script.parentNode.removeChild(script);
+//       }
+//     };
+
+//     const query = new URLSearchParams({
+//       sheet,
+//       callback: callbackName,
+//       ...params,
+//     }).toString();
+
+//     const script = document.createElement("script");
+//     script.src = `${SCRIPT_URL}?${query}`;
+//     script.async = true;
+//     script.onerror = () => {
+//       delete (window as any)[callbackName];
+//       reject(new Error(`JSONP request failed for ${sheet}`));
+//     };
+
+//     document.body.appendChild(script);
+//   });
+// }
 export function jsonpRequest<T>(
   sheet: string,
   params: Record<string, string> = {}
@@ -18,10 +60,20 @@ export function jsonpRequest<T>(
     const callbackName = `jsonp_cb_${Date.now()}_${Math.floor(
       Math.random() * 1000
     )}`;
+
     (window as any)[callbackName] = (response: any) => {
       try {
-        // console.log(`✅ JSONP Response [${sheet}]`, response);
-        resolve(Array.isArray(response) ? response : response.data || []);
+        let data = response;
+
+        // Handle wrapped format: { data: [...] }
+        if (response && response.data) {
+          data = response.data;
+        }
+
+        // Normalize to array (THIS FIXES YOUR ISSUE)
+        const arr = Array.isArray(data) ? data : [data];
+
+        resolve(arr);
       } catch (err) {
         reject(err);
       } finally {
@@ -47,6 +99,7 @@ export function jsonpRequest<T>(
     document.body.appendChild(script);
   });
 }
+
 
 export function parseAttributes(input: string): Record<string, string> {
   try {
@@ -172,3 +225,42 @@ export function useDarkMode() {
 
   return [isDark, setIsDark] as const;
 }
+
+export const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+
+export const formatDateForUI = (
+  unformattedDate: string,
+  compact: boolean = false
+): string => {
+  const date = new Date(unformattedDate);
+
+  const hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+
+  // Convert to 12-hour format
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const hour12 = (hours % 12 || 12).toString().padStart(2, "0");
+
+  const timeFormatted = compact
+    ? `${hours.toString().padStart(2, "0")}:${minutes}` // 24h format
+    : `${hour12}:${minutes} ${ampm}`; // 12h format
+
+  if (compact) {
+    // Example: 24/01/2025 14:32
+    return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}/${date.getFullYear()} ${timeFormatted}`;
+  }
+
+  // Example: 24 January 2025, 02:32 PM
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = date.toLocaleString("en-US", { month: "long" });
+  const year = date.getFullYear();
+
+  return `${day} ${month} ${year} ${timeFormatted}`;
+};

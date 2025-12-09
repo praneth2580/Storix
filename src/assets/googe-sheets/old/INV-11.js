@@ -202,24 +202,10 @@ function handleGet(e, sheet, sheetName) {
     const filters = Object.entries(e.parameter)
         .filter(([k]) => !['sheet', 'id', 'action', 'callback', 'window', 'interval'].includes(k));
 
-    // MULTI-VALUE FILTER (already correct)
-    if (filters.length) {
-        rows = rows.filter(row =>
-            filters.every(([key, val]) => {
-                if (row[key] === undefined) return false;
-
-                const parts = String(val)
-                    .split(',')
-                    .map(v => v.trim().toLowerCase());
-
-                return parts.includes(String(row[key]).toLowerCase());
-            })
-        );
-    }
-
-    return rows;  // ⭐ IMPORTANT FIX
+    return filters.length
+        ? rows.filter(row => filters.every(([key, val]) => String(row[key]) === String(val)))
+        : rows;
 }
-
 
 
 
@@ -305,6 +291,7 @@ function handleDelete(e, sheet) {
 // ------------------------------------------------------
 // BATCH API (create/update/delete multiple rows across sheets)
 // ------------------------------------------------------
+
 function handleBatch(e) {
     if (!e.parameter.data)
         return { error: "Missing batch payload" };
@@ -327,11 +314,6 @@ function handleBatch(e) {
             const sheet = getOrCreateSheet(op.sheet);
             const action = op.type.toLowerCase();
 
-            // ⭐ STEP 1 — resolve __REF(n).key__ inside op.data
-            if (op.data) {
-                resolveReferences(op.data, results);
-            }
-
             // --- Create ---
             if (action === "create") {
                 const headers = SCHEMAS[op.sheet];
@@ -352,8 +334,7 @@ function handleBatch(e) {
                     index,
                     status: "created",
                     sheet: op.sheet,
-                    id: op.data.id,
-                    ...op.data
+                    id: op.data.id
                 });
 
             }
@@ -380,7 +361,7 @@ function handleBatch(e) {
                 }
 
                 results.push(updated
-                    ? { index, status: "updated", sheet: op.sheet, id, ...op.data }
+                    ? { index, status: "updated", sheet: op.sheet, id }
                     : { index, error: "ID not found", sheet: op.sheet }
                 );
             }
@@ -417,35 +398,6 @@ function handleBatch(e) {
     return { status: "completed", results };
 }
 
-/**
- * Replaces patterns like "__REF(0).id__" with the actual value from results[]
- */
-function resolveReferences(obj, results) {
-    for (const key in obj) {
-        const value = obj[key];
-
-        // Match "__REF(0).id__"
-        if (typeof value === "string") {
-            const match = value.match(/^__REF\((\d+)\)\.(\w+)__$/);
-
-            if (match) {
-                const refIndex = Number(match[1]);
-                const refKey = match[2];
-
-                if (results[refIndex] && results[refIndex][refKey] !== undefined) {
-                    obj[key] = results[refIndex][refKey];
-                } else {
-                    throw new Error(`Invalid reference: ${value}`);
-                }
-            }
-        }
-
-        // Nested object
-        if (typeof value === "object" && value !== null) {
-            resolveReferences(value, results);
-        }
-    }
-}
 
 
 // ------------------------------------------------------

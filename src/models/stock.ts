@@ -8,14 +8,19 @@ import { jsonpRequest } from '../utils.ts';
  * GET Stock (with optional filters)
  */
 export const getStocks = async (
-  params: Record<string, string> = {}
+  params: Record<string, string | string[]> = {}
 ): Promise<IStock[]> => {
+  const finalParams: Record<string, string> = {};
+
+  Object.entries(params).forEach(([key, value]) => {
+    finalParams[key] = Array.isArray(value) ? value.join(",") : value;
+  });
+
   return jsonpRequest<IStock>('Stock', {
     action: "get",
-    ...params,
+    ...finalParams,
   });
 };
-
 
 /**
  * CREATE Product  

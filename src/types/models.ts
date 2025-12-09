@@ -66,18 +66,36 @@ export interface ICustomer {
 // Stock
 export interface IStock {
   id: string;
-  productId: string;
-  variantId?: string | null;
-
-  product?: Product;
-  variant?: Variant;
+  variantId: string;
+  variant: Variant;
 
   // For simple = units  
   // For measured = weight/volume  
   // For variants = units per variant
   quantity: number;
+  unit: string;
+  batchCode: string;
+  metadata: string;
+  location: string;
 
   updatedAt: string;
+}
+
+// Stock
+export interface IStockMovements {
+  id: string;
+  variantId: string;
+
+  product: Product;
+  variant: Variant;
+
+  change: number;
+  unit: string;
+
+  type: "sale" | "purchase" | "other";
+  refId: string;
+
+  createdAt: string;
 }
 
 // 🧾 Order
@@ -285,20 +303,53 @@ export class Customer implements ICustomer {
 
 export class Stock implements IStock {
   id: string;
-  productId: string;
-  variantId?: string | null;
-  product?: Product | undefined;
-  variant?: Variant | undefined;
+  variantId: string;
+  variant: Variant;
   quantity: number;
+  unit: string;
+  batchCode: string;
+  metadata: string;
+  location: string;
   updatedAt: string;
+
 
   constructor(data: IStock) {
     this.id = data.id;
-    this.productId = data.productId;
     this.variantId = data.variantId;
-    if (data.product) this.product = new Product(data.product);
-    if (data.variant) this.variant = new Variant(data.variant);
+    this.variant = new Variant(data.variant);
     this.quantity = data.quantity;
+    this.unit = data.unit;
+    this.batchCode = data.batchCode;
+    this.metadata = data.metadata;
+    this.location = data.location;
     this.updatedAt = data.updatedAt;
+  }
+}
+
+export class StockMovements implements IStockMovements {
+  id: string;
+  
+  variantId: string;
+  product: Product;
+  variant: Variant;
+
+  change: number;
+  unit: string;
+
+  type: "sale" | "purchase" | "other";
+  refId: string;
+
+  createdAt: string;
+  
+  constructor(data: IStockMovements) {
+    this.id = data.id;
+    this.variantId = data.variantId;
+    this.product = new Product(data.product);
+    this.variant = new Variant(data.variant);
+    this.change = data.change;
+    this.unit = data.unit;
+    this.type = data.type;
+    this.refId = data.refId;
+    this.createdAt = data.createdAt;
   }
 }

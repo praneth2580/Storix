@@ -2,8 +2,10 @@
  * @file This file contains CRUD functions for the Order model.
  * These functions interact with a Google Apps Script backend.
  */
-import type { IOrder } from '../types/models';
+import type { Customer, IOrder } from '../types/models';
 import { jsonpRequest, SCRIPT_URL } from '../utils';
+import { getCustomers } from './customers';
+import { getStocks } from './stock';
 
 export const getOrders = async (params: Record<string, string> = {}): Promise<IOrder[]> => {
   return jsonpRequest<IOrder>("Orders", params);
@@ -24,7 +26,7 @@ export const updateOrder = async (Order: Partial<IOrder> & { id: string }): Prom
   const response = await fetch(SCRIPT_URL, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheet: 'Orders', ...Order }),
+    body: JSON.stringify({ sheet: 'Orders', id: Order.id, data: JSON.stringify(Order) }),
   });
   if (!response.ok) throw new Error('Failed to update Order');
   const { data } = await response.json();
@@ -40,8 +42,11 @@ export const deleteOrder = async (id: string): Promise<{ success: boolean }> => 
 
 /**
  * Creates an order + multiple sales items in a single batch request.
- * @param orderData   The order header (customer, totals, etc.)
- * @param items       Array of sales items (variantId, qty, price, etc.)
+ * @param orderData         The order header (customer, totals, etc.)
+ * @param items             Array of sales items (variantId, qty, price, etc.)
+ * @param customer          The Customer to whom the order belongs
+ * @param totalAmount       The Total Amount of the Order
+ * @param totalPayedAmount  The Amount the Customer payed
  */
 export const createBatchOrder = async (
   orderData: Omit<IOrder, 'id' | 'date' | 'createdAt' | 'updatedAt'>,
@@ -53,10 +58,33 @@ export const createBatchOrder = async (
     total: number;
     customerId: string;
     paymentMethod: string;
-  }>
+  }>,
+  customer: Customer,
+  totalAmount: number,
+  totalPayedAmount: number
 ) => {
 
-  const operations: any[] = [];
+  const variantIds = [...new Set(items.map(item => item.variantId))]
+  const _customer = (await getCustomers({ id: customer.id }))?.[0];
+  const stock = await getStocks({ variantId: variantIds });
+
+  _customer.outstandingBalance = (_customer.outstandingBalance ?? 0) + (totalAmount - totalPayedAmount)
+  const _items = stock.map(s => {
+    const item = items.find(item => item.variantId === s.variantId);
+    if (!item || item.quantity > s.quantity) return null;
+    return {
+      variantId: item.variantId,
+      quantity: item.quantity,
+      unit: item.unit,
+      sellingPrice: item.sellingPrice,
+      total: item.sellingPrice,
+      customerId: item.customerId,
+      paymentMethod: item.paymentMethod,
+      stock_id: s.id
+    }
+  }).filter(item => item != null);
+
+  const operations: unknown[] = [];
 
   // A. Order Create (index 0)
   operations.push({
@@ -70,7 +98,7 @@ export const createBatchOrder = async (
   });
 
   // B. Sales Rows
-  items.forEach(item => {
+  _items.forEach(item => {
     operations.push({
       type: "create",
       sheet: "Sales",
@@ -82,8 +110,55 @@ export const createBatchOrder = async (
     });
   });
 
-  // NOW SEND AS "data"
-  const response = await jsonpRequest<any>('Orders', {
+  // C. Customer
+  operations.push({
+    type: "update",
+    sheet: "Customers",
+    id: customer.id,
+    data: {
+      ..._customer,
+      updatedAt: new Date().toISOString()
+    }
+  })
+
+  // D. StockMovements Rows
+  _items.forEach(item => {
+    operations.push({
+      type: "create",
+      sheet: "StockMovements",
+      data: {
+        variantId: item.variantId,
+        change: item.quantity * -1,
+        unit: item.unit,
+        type: 'sale',
+        refId: "__REF(0).id__",
+        createdAt: new Date().toISOString()
+      }
+    });
+  });
+
+  // E. Stock Rows
+  stock.forEach(s => {
+    const item = _items.find(item => item.variantId === s.variantId);
+    if (!item) return;
+
+    operations.push({
+      type: "update",
+      sheet: "Stock",
+      id: item.stock_id,
+      data: {
+        variantId: s.variantId,
+        quantity: (s.quantity - item.quantity),
+        unit: s.unit,
+        batchCode: s.batchCode,
+        metadata: s.metadata,
+        location: s.location,
+        updatedAt: new Date().toISOString(),
+      }
+    });
+  });
+
+  const response = await jsonpRequest<unknown>('Orders', {
     action: "batch",
     data: JSON.stringify({ operations })  // IMPORTANT!
   });

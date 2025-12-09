@@ -40,6 +40,7 @@ export const updateCustomer = async (
 ): Promise<ICustomer> => {
   const result = await jsonpRequest<ICustomer>('Customers', {
     action: "update",
+    id: Customer.id,
     data: JSON.stringify(Customer),
   });
 

@@ -85,8 +85,6 @@ const Form = <T extends object>({
     prevDataRef.current = formData;
   }, [formData]);
 
-  console.log("dynamicOptions: ", dynamicOptions)
-
   const handleChange = useGenericChange(setFormData);
   const handlePhoneChange = usePhoneChange(setFormData, 10);
   const handleEmailChange = useEmailChange(setFormData);
