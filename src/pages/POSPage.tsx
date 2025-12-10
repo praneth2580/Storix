@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DarkModeToggle from "../components/DarkModeToggle";
 import { getVariants } from "../models/variants";
-import { Customer, Variant, type ICustomer } from "../types/models";
+import { Customer, Stock, Variant, type ICustomer, type IStock, type IVariant } from "../types/models";
 import Loader from "../components/Loader";
 import { motion, AnimatePresence } from "framer-motion";
 import CountHandler from "../components/CountHandler";
@@ -15,19 +15,23 @@ import AutoCompleteSearch from "../components/AutoCompleteSearch";
 import { createCustomer, getCustomers, updateCustomer } from "../models/customers";
 import { Toggle } from "../components/Toggle";
 import { createBatchOrder } from "../models/order";
+import { openNewTab } from "../utils";
+import { getStocks } from "../models/stock";
 
 /** Local cart item */
 type CartItem = Partial<Variant> & { count: number };
+type POSItem = Partial<Variant> & { quantity: number };
 
 const CART_LS_KEY = "storix_pos_cart_v2";
 
 const POSPage: React.FC = () => {
-    const [posItems, setPOSItems] = useState<Variant[]>([]);
+    const [posItems, setPOSItems] = useState<POSItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [activeCategory, setActiveCategory] = useState<string>("All");
     const [cart, setCart] = useState<CartItem[]>([]);
+    const [isCartStorageChecked, setIsCartStorageChecked] = useState<boolean>(false);
     const [customerModalOpen, setCustomerModalOpen] = useState<boolean>(false);
     const [chosenCustomer, setChosenCustomer] = useState<Customer>();
     const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
@@ -38,7 +42,19 @@ const POSPage: React.FC = () => {
 
     // Load variants
     useEffect(() => {
-        loadVariants();
+        (async () => {
+            const [variants, stocks] = await Promise.all([
+                loadVariants(),
+                loadStocks()
+            ]);
+
+            const variantsWithCount = variants?.map(varaint => ({
+                ...varaint,
+                quantity: stocks?.filter(stock => stock.variantId === varaint.id).reduce((a, b) => a + b.quantity, 0) ?? 0
+            }))
+
+            setPOSItems(variantsWithCount ?? []);
+        })();
     }, []);
 
     useEffect(() => {
@@ -55,6 +71,7 @@ const POSPage: React.FC = () => {
             if (raw) {
                 const parsed: CartItem[] = JSON.parse(raw);
                 setCart(parsed.map((c) => ({ ...c, count: c.count ?? 1 })));
+                setIsCartStorageChecked(true);
             }
         } catch {
             console.log("ERROR-1")
@@ -64,7 +81,7 @@ const POSPage: React.FC = () => {
     // Persist cart
     useEffect(() => {
         try {
-            localStorage.setItem(CART_LS_KEY, JSON.stringify(cart));
+            if (isCartStorageChecked) localStorage.setItem(CART_LS_KEY, JSON.stringify(cart));
         } catch {
             console.log("ERROR-2")
         }
@@ -90,7 +107,21 @@ const POSPage: React.FC = () => {
         try {
             setLoading(true);
             const fetched = await getVariants();
-            setPOSItems(fetched.map((v: any) => new Variant(v)));
+            return fetched.map((v: IVariant) => new Variant(v));
+            // setPOSItems(fetched.map((v: IVariant) => new Variant(v)));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to load products");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadStocks = async () => {
+        try {
+            setLoading(true);
+            const fetched = await getStocks();
+            return fetched.map((v: IStock) => new Stock(v));
+            // setStocks(fetched.map((v: IStock) => new Stock(v)));
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load products");
         } finally {
@@ -281,21 +312,26 @@ const POSPage: React.FC = () => {
 
                                         {/* CTA */}
                                         <div className="mt-3">
-                                            {!inCart ? (
-                                                <button
-                                                    onClick={() => addToCart(variant)}
-                                                    className="w-full py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition"
+                                            {!inCart ?
+                                                variant.quantity > 0 ? <button
+                                                    onClick={() => addToCart(new Variant(variant as IVariant))}
+                                                    className="w-full py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition cursor-pointer"
                                                 >
                                                     Add
+                                                </button> : <button
+                                                    className="w-full py-2 rounded-lg bg-red-800 hover:bg-red-900 text-red-200 font-medium transition cursor-not-allowed"
+                                                >
+                                                    Out Of Stock
                                                 </button>
-                                            ) : (
-                                                <CountHandler
-                                                    itemCount={count}
-                                                    handleCountChange={(d) =>
-                                                        handleCountChange(variant, d)
-                                                    }
-                                                />
-                                            )}
+                                                : (
+                                                    <CountHandler
+                                                        itemCount={count}
+                                                        maxCount={variant.quantity}
+                                                        handleCountChange={(d) =>
+                                                            handleCountChange(new Variant(variant as IVariant), d)
+                                                        }
+                                                    />
+                                                )}
                                         </div>
                                     </motion.div>
                                 );
@@ -358,6 +394,7 @@ const POSPage: React.FC = () => {
                                             <div className="mt-3 flex items-center justify-between">
                                                 <CountHandler
                                                     itemCount={item.count}
+                                                    maxCount={posItems.find(posI => posI.id === item.id)?.quantity ?? 0}
                                                     handleCountChange={(d) =>
                                                         handleCountChange(item, d)
                                                     }
@@ -365,7 +402,7 @@ const POSPage: React.FC = () => {
 
                                                 <button
                                                     onClick={() =>
-                                                        removeFromCart(item.id)
+                                                        removeFromCart(item?.id ?? '')
                                                     }
                                                     className="text-xs text-red-400 hover:text-red-500"
                                                 >
@@ -475,6 +512,7 @@ const POSPage: React.FC = () => {
                                             <div className="mt-3 flex items-center justify-between">
                                                 <CountHandler
                                                     itemCount={item.count}
+                                                    maxCount={posItems.find(posI => posI.id === item.id)?.quantity ?? 0}
                                                     handleCountChange={(d) =>
                                                         handleCountChange(item, d)
                                                     }
@@ -554,10 +592,13 @@ const POSPage: React.FC = () => {
                 })}
                 setLoading={setLoading}
                 cart={cart}
-                onClose={() => setPaymentModalOpen(false)} 
-                onSuccess={() => {
+                onClose={() => setPaymentModalOpen(false)}
+                onSuccess={(orderId) => {
                     setCart([]);
-                }}/>
+                    setLoading(false);
+                    openNewTab(`/full/invoice/${orderId}`);
+                    setPaymentModalOpen(false);
+                }} />
         </div>
     );
 };
@@ -696,7 +737,7 @@ const CustomerModal = ({ show, onClose, chosenCustomer, setLoading }: { show: bo
     </Modal>
 }
 
-const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: { show: boolean; onClose: () => void, customer: Customer, cart: CartItem[], setLoading: React.Dispatch<React.SetStateAction<boolean>>, onSuccess: () => void }) => {
+const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: { show: boolean; onClose: () => void, customer: Customer, cart: CartItem[], setLoading: React.Dispatch<React.SetStateAction<boolean>>, onSuccess: (orderID: string) => void }) => {
 
 
     const totalItems = useMemo(
@@ -741,7 +782,7 @@ const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: 
             }
 
             const items = cart.map(c => ({
-                "variantId": c.id ?? '', 
+                "variantId": c.id ?? '',
                 "quantity": c.count ?? 0,
                 "unit": c.product?.baseUnit ?? '',
                 "sellingPrice": c.sellingPrice ?? 0,
@@ -755,7 +796,7 @@ const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: 
 
             const { orderId } = await createBatchOrder(order, items, _customer, total, totalPaymentAmount);
             setLoading(false);
-            onSuccess()
+            onSuccess(orderId);
 
         } catch (error) {
             console.log(error);

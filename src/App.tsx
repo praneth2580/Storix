@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, NavLink, Outlet, Navigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Outlet, Navigate, useLocation, matchPath } from 'react-router-dom';
 import { routeConfig } from './routes';
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/POSPage';
@@ -8,20 +8,26 @@ import DarkModeToggle from './components/DarkModeToggle';
 const Layout = () => {
   const [isNavOpen, setIsNavOpen] = useState(false);
 
+  const fullscreen_routes = routeConfig.filter(route => route.fullScreen).map(route => route.path);
+  const location = useLocation()
+  const isFullscreen = fullscreen_routes.some(pattern =>
+    matchPath(pattern, location.pathname)
+  );
+
   const toggleNav = () => {
     setIsNavOpen(!isNavOpen);
   };
-  
+
   return (
     <div
       className={`flex h-screen bg-gray-100 dark:bg-gray-950 ${isNavOpen ? "overflow-hidden" : ""
         }`}
     >
       {/* Mobile Top Bar */}
-      <div className="md:hidden flex items-center justify-between p-2 
-      bg-white dark:bg-gray-900
-      border-b border-gray-200 dark:border-gray-700
-      w-full fixed z-50" id='mobile-top-nav'>
+      <div className={`md:hidden flex items-center justify-between p-2 
+        bg-white dark:bg-gray-900
+        border-b border-gray-200 dark:border-gray-700
+        w-full fixed z-50 ${isFullscreen ? 'hidden' : ''}`} id='mobile-top-nav'>
         <button
           className="text-2xl bg-transparent border-none cursor-pointer text-black dark:text-gray-300"
           onClick={toggleNav}
@@ -32,14 +38,11 @@ const Layout = () => {
 
       {/* Sidebar Navigation */}
       <nav
-        className={`
-      fixed top-0 left-0 h-full w-64 flex-shrink-0
-      bg-white dark:bg-gray-900
-      border-r border-gray-200 dark:border-gray-700
-      p-5 flex flex-col transition-transform duration-300 ease-in-out
-      md:relative md:translate-x-0
-      ${isNavOpen ? "translate-x-0 z-50" : "-translate-x-full"}
-    `}
+        className={`fixed top-0 left-0 h-full w-64 flex-shrink-0
+          bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700
+          p-5 flex flex-col transition-transform duration-300 ease-in-out
+          md:relative md:translate-x-0 ${isFullscreen ? 'hidden' : ''}
+          ${isNavOpen ? "translate-x-0 z-50" : "-translate-x-full"}`}
       >
         {/* Banner */}
         <div className="flex items-center mb-5">
@@ -103,7 +106,7 @@ const Layout = () => {
       {/* Backdrop on mobile */}
       {isNavOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className={`fixed  ${isFullscreen ? 'hidden' : ''} inset-0 bg-black/50 z-40 md:hidden`}
           onClick={toggleNav}
         ></div>
       )}

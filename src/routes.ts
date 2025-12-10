@@ -16,6 +16,7 @@ export interface RouteItem {
   name: string;
   icon: string;
   hideInSidebar?: boolean;
+  fullScreen?: boolean;
   component: React.ComponentType;
 }
 
@@ -91,6 +92,14 @@ export const routeConfig: RouteItem[] = [
     name: 'Invoice',
     icon: '/logo.png',
     hideInSidebar: true,
+    component: InvoicePage,
+  },
+  {
+    path: '/full/invoice/:OI',
+    name: 'Invoice',
+    icon: '/logo.png',
+    hideInSidebar: true,
+    fullScreen: true,
     component: InvoicePage,
   },
 ];

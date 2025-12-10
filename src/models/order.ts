@@ -158,12 +158,12 @@ export const createBatchOrder = async (
     });
   });
 
-  const response = await jsonpRequest<unknown>('Orders', {
+  const response = await jsonpRequest<[{ results: unknown, status: string }]>('Orders', {
     action: "batch",
     data: JSON.stringify({ operations })  // IMPORTANT!
   });
 
-  const batch = response;
+  const batch = response?.[0];
 
   const orderId = batch.results[0].id;
   const salesItemIds = batch.results.slice(1).map((r: any) => r.id);

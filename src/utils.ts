@@ -264,3 +264,13 @@ export const formatDateForUI = (
 
   return `${day} ${month} ${year} ${timeFormatted}`;
 };
+
+export const openNewTab = (endpoint) => {
+  const base = window.location.origin + import.meta.env.BASE_URL;
+  const url = `${base}#${endpoint}`;
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.click();
+};

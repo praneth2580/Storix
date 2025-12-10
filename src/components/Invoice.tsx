@@ -176,14 +176,17 @@ export function Invoice({ data }: { data: InvoiceData }) {
     return (
         <>
             <PrintableInvoice data={data} />
-            <div id="none-printable-invoice" className="w-full min-h-screen flex justify-center py-10 px-4 bg-gray-100 dark:bg-gray-900 transition-colors">
-                <div className="w-full max-w-6xl bg-white dark:bg-gray-800 rounded-xl shadow-xl flex overflow-hidden transition-colors">
+            <div
+                id="none-printable-invoice"
+                className="w-full min-h-screen flex justify-center py-6 px-3 sm:px-6 bg-gray-100 dark:bg-gray-900 transition-colors"
+            >
+                <div className="w-full max-w-6xl bg-white dark:bg-gray-800 rounded-xl shadow-xl flex flex-col lg:flex-row overflow-hidden transition-colors">
 
                     {/* MAIN CONTENT */}
-                    <div className="flex-1 p-8 invoice-canvas" ref={invoiceRef}>
+                    <div className="flex-1 p-5 sm:p-8 invoice-canvas" ref={invoiceRef}>
 
                         {/* Breadcrumb + Status */}
-                        <div className="flex justify-between items-center mb-6">
+                        <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
                             <p className="text-sm text-gray-400 dark:text-gray-500">
                                 PAYMENTS / INVOICE {data.orderId}
                             </p>
@@ -197,7 +200,7 @@ export function Invoice({ data }: { data: InvoiceData }) {
                             </button>
                         </div>
 
-                        {/* Title + Status */}
+                        {/* Title */}
                         <div className="flex items-center gap-3 mb-6">
                             <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 text-xs rounded-full">
                                 INVOICE
@@ -208,37 +211,35 @@ export function Invoice({ data }: { data: InvoiceData }) {
                             </h1>
                         </div>
 
-                        {/* CENTER PAPER CARD */}
-                        <div className="bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg shadow-md p-8 max-w-3xl mx-auto transition-colors">
+                        {/* PAPER CARD */}
+                        <div className="bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg shadow-md p-6 sm:p-8 max-w-3xl mx-auto transition-colors">
 
                             {/* ORDER DETAILS */}
-                            <div>
-                                <h2 className="text-gray-800 dark:text-gray-100 font-semibold mb-4">
-                                    ORDER DETAILS
-                                </h2>
+                            <h2 className="text-gray-800 dark:text-gray-100 font-semibold mb-4">
+                                ORDER DETAILS
+                            </h2>
 
-                                <div className="grid grid-cols-3 text-sm py-2">
-                                    <p className="text-gray-500 dark:text-gray-300">Name</p>
-                                    <p className="col-span-2 font-medium dark:text-gray-100">
-                                        {data.customerName}
-                                    </p>
-                                </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 text-sm py-2">
+                                <p className="text-gray-500 dark:text-gray-300">Name</p>
+                                <p className="sm:col-span-2 font-medium dark:text-gray-100">
+                                    {data.customerName}
+                                </p>
+                            </div>
 
-                                <div className="grid grid-cols-3 text-sm py-2 border-b dark:border-gray-600">
-                                    <p className="text-gray-500 dark:text-gray-300">Tansaction Date</p>
-                                    <p className="col-span-2 font-medium dark:text-gray-100">
-                                        {formatDateForUI(data.date)}
-                                    </p>
-                                </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 text-sm py-2 border-b dark:border-gray-600">
+                                <p className="text-gray-500 dark:text-gray-300">Transaction Date</p>
+                                <p className="sm:col-span-2 font-medium dark:text-gray-100">
+                                    {formatDateForUI(data.date)}
+                                </p>
                             </div>
 
                             {/* ITEMS TABLE */}
-                            <div className="mt-6">
+                            <div className="mt-6 overflow-x-auto">
                                 <h2 className="text-gray-800 dark:text-gray-100 font-semibold mb-4">
                                     ITEMS
                                 </h2>
 
-                                <table className="w-full text-sm">
+                                <table className="w-full min-w-[500px] text-sm">
                                     <thead>
                                         <tr className="text-gray-500 dark:text-gray-300 border-b dark:border-gray-600">
                                             <th className="text-left py-2">Item</th>
@@ -251,9 +252,15 @@ export function Invoice({ data }: { data: InvoiceData }) {
                                     <tbody>
                                         {data.items.map((item, i) => (
                                             <tr key={i} className="border-b dark:border-gray-600">
-                                                <td className="py-3 font-medium text-gray-700 dark:text-gray-100">{item.name}</td>
-                                                <td className="py-3 text-gray-600 dark:text-gray-300">{item.quantity}</td>
-                                                <td className="py-3 text-gray-600 dark:text-gray-300">₹{item.sellingPrice}</td>
+                                                <td className="py-3 font-medium text-gray-700 dark:text-gray-100">
+                                                    {item.name}
+                                                </td>
+                                                <td className="py-3 text-gray-600 dark:text-gray-300">
+                                                    {item.quantity}
+                                                </td>
+                                                <td className="py-3 text-gray-600 dark:text-gray-300">
+                                                    ₹{item.sellingPrice}
+                                                </td>
                                                 <td className="py-3 text-right font-semibold text-gray-800 dark:text-gray-100">
                                                     ₹{item.total}
                                                 </td>
@@ -261,32 +268,35 @@ export function Invoice({ data }: { data: InvoiceData }) {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
 
-                                {/* SUBTOTALS */}
-                                <div className="mt-6 space-y-1">
-                                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-                                        <span>Subtotal</span>
-                                        <span>₹{data.subTotal}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-                                        <span>Tax</span>
-                                        <span>₹{data.tax}</span>
-                                    </div>
+                            {/* SUBTOTALS */}
+                            <div className="mt-6 space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">Subtotal</span>
+                                    <span className="dark:text-gray-100">₹{data.subTotal}</span>
+                                </div>
 
-                                    <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-gray-100 border-t dark:border-gray-600 pt-3 mt-3">
-                                        <span>Total</span>
-                                        <span>₹{data.total}</span>
-                                    </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">Tax</span>
+                                    <span className="dark:text-gray-100">₹{data.tax}</span>
+                                </div>
+
+                                <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-gray-100 border-t dark:border-gray-600 pt-3 mt-3">
+                                    <span>Total</span>
+                                    <span>₹{data.total}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* RIGHT SIDEBAR */}
-                    <div className="w-80 bg-gray-50 dark:bg-gray-800 border-l dark:border-gray-700 p-8 flex flex-col justify-between transition-colors">
+                    {/* SIDEBAR */}
+                    <div className="w-full lg:w-80 bg-gray-50 dark:bg-gray-800 border-t lg:border-t-0 lg:border-l dark:border-gray-700 p-6 sm:p-8 flex flex-col justify-between transition-colors">
 
                         <div>
-                            <h2 className="text-gray-800 dark:text-gray-100 font-semibold mb-4">ORDER DETAIL</h2>
+                            <h2 className="text-gray-800 dark:text-gray-100 font-semibold mb-4">
+                                ORDER DETAIL
+                            </h2>
 
                             <div className="space-y-3 text-sm">
                                 <p className="font-medium dark:text-gray-100">{data.customerName}</p>
@@ -340,10 +350,10 @@ export function Invoice({ data }: { data: InvoiceData }) {
                                 Share
                             </button>
                         </div>
-
                     </div>
                 </div>
             </div>
+
         </>
     );
 }
