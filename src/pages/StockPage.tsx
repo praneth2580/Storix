@@ -68,7 +68,8 @@ const StockPage = () => {
 
     const columns = [
         { header: 'ID', accessor: 'id' as keyof Stock },
-        { header: 'Product Name', accessor: (row: Stock) => row.product?.name
+        {
+            header: 'Product Name', accessor: (row: Stock) => row.product?.name
         },
         {
             header: 'Variant', accessor: (row: Stock) => row.variant?.attributes ?
@@ -106,11 +107,24 @@ const StockPage = () => {
             setLoading(true);
             const stockData = {
                 id: formData.id || '',
-                productId: formData.productId || '',
                 variantId: formData.variantId || '',
-                quantity: formData.quantity || 0,
-                updatedAt: new Date().toISOString()
-            };
+                variant: new Variant(formData.variant || {
+                    id: "",
+                    productId: "",
+                    sku: "",
+                    attributes: {},
+                    costPrice: 0,
+                    sellingPrice: 0,
+                    createdAt: "",
+                    updatedAt: "",
+                }),
+                quantity: formData.quantity ?? 0,
+                unit: formData.unit || '',
+                batchCode: formData.batchCode || '',
+                metadata: formData.metadata || '',
+                location: formData.location || '',
+                updatedAt: new Date().toISOString(),
+            }
 
             await createStock(stockData);
             await loadStocks(); // Refresh the list
@@ -130,7 +144,7 @@ const StockPage = () => {
 
     return (
         <>
-            <Loader loading={loading}/>
+            <Loader loading={loading} />
             <div className="container mx-auto p-4">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-2xl font-bold">Stock</h1>
@@ -165,10 +179,23 @@ const StockPage = () => {
                         onClose={() => setShowModal(false)}
                         initialData={new Stock({
                             id: '',
-                            productId: '',
-                            variantId: '',
+                            variantId: "",
+                            variant: new Variant({
+                                id: "",
+                                productId: "",
+                                sku: "",
+                                attributes: {},
+                                costPrice: 0,
+                                sellingPrice: 0,
+                                createdAt: "",
+                                updatedAt: "",
+                            }),
                             quantity: 0,
-                            updatedAt: new Date().toISOString()
+                            unit: "",
+                            batchCode: "",
+                            metadata: "",
+                            location: "",
+                            updatedAt: new Date().toISOString(),
                         })}
                     />
                 </Modal>

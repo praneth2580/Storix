@@ -58,7 +58,7 @@ const InvoicePage = () => {
       customerEmail: customer?.email,
       date: order.date,
       paymentMethod: order.paymentMethod ?? "",
-      items: invoiceItems as InvoiceItem,
+      items: invoiceItems as InvoiceItem[],
       subTotal: order.totalAmount,
       tax: (order.totalAmount),
       total: order.totalAmount,
@@ -72,9 +72,7 @@ const InvoicePage = () => {
 
   return <div>
     <Loader loading={loading}/>
-    {orderData ? <Invoice
-      fullscreen
-      data={orderData} /> : <div><p>No Order Found</p></div>}
+    {orderData ? <Invoice data={orderData} /> : <div><p>No Order Found</p></div>}
   </div>;
 };
 

@@ -265,7 +265,7 @@ export const formatDateForUI = (
   return `${day} ${month} ${year} ${timeFormatted}`;
 };
 
-export const openNewTab = (endpoint) => {
+export const openNewTab = (endpoint: string) => {
   const base = window.location.origin + import.meta.env.BASE_URL;
   const url = `${base}#${endpoint}`;
   const a = document.createElement("a");

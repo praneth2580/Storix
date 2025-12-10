@@ -2,6 +2,7 @@
  * @file This file contains CRUD functions for the Order model.
  * These functions interact with a Google Apps Script backend.
  */
+import type { BatchEntry, BatchResponseItem } from '../types/general';
 import type { Customer, IOrder } from '../types/models';
 import { jsonpRequest, SCRIPT_URL } from '../utils';
 import { getCustomers } from './customers';
@@ -158,7 +159,7 @@ export const createBatchOrder = async (
     });
   });
 
-  const response = await jsonpRequest<[{ results: unknown, status: string }]>('Orders', {
+  const response = await jsonpRequest<BatchResponseItem>('Orders', {
     action: "batch",
     data: JSON.stringify({ operations })  // IMPORTANT!
   });
@@ -166,7 +167,7 @@ export const createBatchOrder = async (
   const batch = response?.[0];
 
   const orderId = batch.results[0].id;
-  const salesItemIds = batch.results.slice(1).map((r: any) => r.id);
+  const salesItemIds = batch.results.slice(1).map((r: BatchEntry) => r.id);
 
   return {
     orderId,

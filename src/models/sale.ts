@@ -29,7 +29,7 @@ export const getSales = async (
     }
     // Strings → pass as-is
     else {
-      queryParams[key] = value;
+      queryParams[key] = String(value);
     }
   });
 
