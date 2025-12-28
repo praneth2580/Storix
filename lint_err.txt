@@ -1,0 +1,6 @@
+
+> magic-patterns-vite-template@0.0.1 lint
+> eslint . --ext .js,.jsx,.ts,.tsx
+
+Invalid option '--ext' - perhaps you meant '-c'?
+You're using eslint.config.js, some command line flags are no longer available. Please see https://eslint.org/docs/latest/use/command-line-interface for details.

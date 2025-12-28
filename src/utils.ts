@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
-import type { OptionData } from "./components/Form";
+// Removed broken import
+export interface OptionData {
+  value: string;
+  label: string;
+}
 
 export const SCRIPT_ID = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
 export const SCRIPT_URL = `https://script.google.com/macros/s/${SCRIPT_ID}/exec`;

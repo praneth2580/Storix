@@ -1,0 +1,36 @@
+(node:24280) ExperimentalWarning: CommonJS module C:\Users\prane\AppData\Roaming\nvm\v23.3.0\node_modules\npm\node_modules\debug\src\node.js is loading ES Module C:\Users\prane\AppData\Roaming\nvm\v23.3.0\node_modules\npm\node_modules\supports-color\index.js using require().
+Support for loading ES Module in require() is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+src/App.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Dashboard.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/InventoryTable.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/InventoryTable.tsx(127,16): error TS6133: 'setData' is declared but its value is never read.
+src/components/Login.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/MetricCard.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/MiniChart.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/POS.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/POS.tsx(2,96): error TS6133: 'X' is declared but its value is never read.
+src/components/Products.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/PurchaseEntry.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Reports.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Reports.tsx(10,5): error TS6133: 'Filter' is declared but its value is never read.
+src/components/Reports.tsx(13,5): error TS6133: 'PieChart' is declared but its value is never read.
+src/components/Reports.tsx(14,5): error TS6133: 'LineChart' is declared but its value is never read.
+src/components/SalesEntry.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Settings.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/Sidebar.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/Suppliers.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Suppliers.tsx(38,21): error TS6133: 'setSuppliers' is declared but its value is never read.
+src/routes.ts(1,27): error TS2307: Cannot find module './pages/DashboardPage' or its corresponding type declarations.
+src/routes.ts(2,25): error TS2307: Cannot find module './pages/ProductPage' or its corresponding type declarations.
+src/routes.ts(3,23): error TS2307: Cannot find module './pages/StockPage' or its corresponding type declarations.
+src/routes.ts(4,23): error TS2307: Cannot find module './pages/SalesPage' or its corresponding type declarations.
+src/routes.ts(5,27): error TS2307: Cannot find module './pages/PurchasesPage' or its corresponding type declarations.
+src/routes.ts(6,27): error TS2307: Cannot find module './pages/SuppliersPage' or its corresponding type declarations.
+src/routes.ts(7,25): error TS2307: Cannot find module './pages/ReportsPage' or its corresponding type declarations.
+src/routes.ts(8,26): error TS2307: Cannot find module './pages/SettingsPage' or its corresponding type declarations.
+src/routes.ts(9,22): error TS2307: Cannot find module './pages/HelpPage' or its corresponding type declarations.
+src/routes.ts(10,23): error TS2307: Cannot find module './pages/AboutPage' or its corresponding type declarations.
+src/routes.ts(11,26): error TS2307: Cannot find module './pages/CustomerPage' or its corresponding type declarations.
+src/routes.ts(12,25): error TS2307: Cannot find module './pages/InvoicePage' or its corresponding type declarations.
+src/utils.ts(273,53): error TS2339: Property 'env' does not exist on type 'ImportMeta'.

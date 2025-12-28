@@ -1,194 +1,121 @@
-import { useState } from 'react';
-import { Routes, Route, NavLink, Outlet, Navigate, useLocation, matchPath } from 'react-router-dom';
-import { routeConfig } from './routes';
-import DashboardPage from './pages/DashboardPage';
-import POSPage from './pages/POSPage';
-import DarkModeToggle from './components/DarkModeToggle';
-
-const Layout = () => {
-  const [isNavOpen, setIsNavOpen] = useState(false);
-
-  const fullscreen_routes = routeConfig.filter(route => route.fullScreen).map(route => route.path);
-  const location = useLocation()
-  const isFullscreen = fullscreen_routes.some(pattern =>
-    matchPath(pattern, location.pathname)
-  );
-
-  const toggleNav = () => {
-    setIsNavOpen(!isNavOpen);
-  };
-
+import React, { useEffect, useState } from 'react'
+import { Sidebar } from './components/Sidebar'
+import { Dashboard } from './components/Dashboard'
+import { InventoryTable } from './components/InventoryTable'
+import { Login } from './components/Login'
+import { Products } from './components/Products'
+import { SalesEntry } from './components/SalesEntry'
+import { PurchaseEntry } from './components/PurchaseEntry'
+import { Suppliers } from './components/Suppliers'
+import { Settings } from './components/Settings'
+import { POS } from './components/POS'
+import { Reports } from './components/Reports'
+import { Menu } from 'lucide-react'
+export function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  // Initialize theme
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
+    if (savedTheme) {
+      setTheme(savedTheme)
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setTheme('dark')
+    }
+  }, [])
+  // Apply theme class
+  useEffect(() => {
+    const root = window.document.documentElement
+    root.classList.remove('light', 'dark')
+    root.classList.add(theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }
+  if (!isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />
+  }
   return (
-    <div
-      className={`flex h-screen bg-gray-100 dark:bg-gray-950 ${isNavOpen ? "overflow-hidden" : ""
-        }`}
-    >
-      {/* Mobile Top Bar */}
-      <div className={`md:hidden flex items-center justify-between p-2 
-        bg-white dark:bg-gray-900
-        border-b border-gray-200 dark:border-gray-700
-        w-full fixed z-50 ${isFullscreen ? 'hidden' : ''}`} id='mobile-top-nav'>
-        <button
-          className="text-2xl bg-transparent border-none cursor-pointer text-black dark:text-gray-300"
-          onClick={toggleNav}
-        >
-          &#9776;
-        </button>
+    <div className="flex h-screen w-full bg-primary text-text-primary overflow-hidden font-sans selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-200">
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-secondary border-b border-border-primary flex items-center px-4 z-50 justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="text-text-secondary"
+          >
+            <Menu size={24} />
+          </button>
+          <span className="font-bold text-lg">Storix</span>
+        </div>
       </div>
 
-      {/* Sidebar Navigation */}
-      <nav
-        className={`fixed top-0 left-0 h-full w-64 flex-shrink-0
-          bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700
-          p-5 flex flex-col transition-transform duration-300 ease-in-out
-          md:relative md:translate-x-0 ${isFullscreen ? 'hidden' : ''}
-          ${isNavOpen ? "translate-x-0 z-50" : "-translate-x-full"}`}
+      {/* Persistent Sidebar */}
+      <div
+        className={`
+        fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}
       >
-        {/* Banner */}
-        <div className="flex items-center mb-5">
-          <div
-            className={`bg-[url(/Storix/banner.png)] w-full h-15 mr-3 bg-cover bg-center rounded`}
-          />
-        </div>
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab)
+            setIsSidebarOpen(false)
+          }}
+          onLogout={() => setIsAuthenticated(false)}
+        />
+      </div>
 
-        {/* Navigation Links */}
-        <ul className="list-none p-0 m-0 h-full">
-          {routeConfig.filter(route => route.hideInSidebar != true).map((route) => (
-            <li key={route.path}>
-              <NavLink
-                to={route.path}
-                className={({ isActive }) =>
-                  `
-              block p-4 rounded-lg mb-2 transition-colors duration-300
-              text-gray-700 dark:text-gray-300
-              ${isActive
-                    ? "bg-blue-100 dark:bg-blue-900/60 text-blue-500 dark:text-blue-400 font-bold"
-                    : "hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-500 dark:hover:text-blue-300"
-                  }
-            `
-                }
-                onClick={() => setIsNavOpen(false)}
-              >
-                {route.name}
-              </NavLink>
-            </li>
-          ))}
-
-          {/* POS Button */}
-          <li key="/pos">
-            <NavLink
-              to="/pos"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={({ isActive }) =>
-                `
-            block p-4 text-center font-bold rounded-lg mb-2 transition-colors duration-300
-            bg-blue-400 dark:bg-blue-600 text-white
-            ${isActive
-                  ? "bg-blue-500 dark:bg-blue-700"
-                  : "hover:bg-blue-500 dark:hover:bg-blue-700"
-                }
-          `
-              }
-              onClick={() => setIsNavOpen(false)}
-            >
-              POS
-            </NavLink>
-          </li>
-        </ul>
-
-        {/* Dark Mode Toggle */}
-        <div className="self-start">
-          <DarkModeToggle />
-        </div>
-      </nav>
-
-      {/* Backdrop on mobile */}
-      {isNavOpen && (
+      {/* Overlay for mobile sidebar */}
+      {isSidebarOpen && (
         <div
-          className={`fixed  ${isFullscreen ? 'hidden' : ''} inset-0 bg-black/50 z-40 md:hidden`}
-          onClick={toggleNav}
-        ></div>
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
       )}
 
-      {/* Main Content */}
-      <main className="flex-grow p-5 overflow-y-auto mt-12 md:mt-0 text-gray-800 dark:text-gray-200">
-        <Outlet />
+      {/* Main Content Area */}
+      <main className="flex-1 h-full overflow-hidden flex flex-col relative pt-14 md:pt-0">
+        {/* Top decorative line */}
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-border-primary to-transparent z-10 hidden md:block"></div>
+
+        {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'pos' && <POS />}
+        {activeTab === 'stock' && <InventoryTable />}
+        {activeTab === 'products' && <Products />}
+        {activeTab === 'sales' && <SalesEntry />}
+        {activeTab === 'purchases' && <PurchaseEntry />}
+        {activeTab === 'suppliers' && <Suppliers />}
+        {activeTab === 'reports' && <Reports />}
+        {activeTab === 'settings' && (
+          <Settings theme={theme} onToggleTheme={toggleTheme} />
+        )}
+
+        {/* Fallback for undefined routes */}
+        {![
+          'dashboard',
+          'pos',
+          'stock',
+          'products',
+          'sales',
+          'purchases',
+          'suppliers',
+          'reports',
+          'settings',
+        ].includes(activeTab) && (
+            <div className="flex items-center justify-center h-full text-text-muted flex-col gap-4">
+              <div className="text-6xl font-mono opacity-20">404</div>
+              <div className="text-xl">Module Not Found</div>
+              <p className="text-sm max-w-md text-center font-mono">
+                Error: The requested module "{activeTab}" could not be loaded.
+              </p>
+            </div>
+          )}
       </main>
     </div>
   )
-};
-
-const ProtectedRoute = ({
-  isAllowed,
-  children,
-}: {
-  isAllowed: boolean;
-  children: React.ReactNode;
-}) => {
-  if (!isAllowed) {
-    return <Navigate to="/" replace />;
-  }
-  return <>{children}</>;
 }
-
-function App() {
-  const [isScriptIDPresent, setIsScriptIDPresent] = useState<boolean>(true);
-
-  // Check localStorage for 'hideGettingStarted' on initial load
-  useState<() => void>(() => {
-    const scriptId: string | null = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
-    if (scriptId === '' || !scriptId) {
-      setIsScriptIDPresent(false);
-    }
-  });
-
-  // Effect to listen for changes in localStorage
-  useState<() => void>(() => {
-    const handleStorageChange = (): void => {
-      const scriptId: string | null = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
-      setIsScriptIDPresent(scriptId === '' || !scriptId);
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  });
-
-  return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        {/* Home route — always allowed */}
-        <Route index element={<DashboardPage />} />
-
-        {routeConfig.map((route) => {
-          // const Component = pageComponents[route.name];
-          const Component = route.component;
-          if (!Component || route.path === "/") return null;
-
-          return (
-            <Route
-              key={route.path}
-              path={route.path.substring(1)}
-              element={
-                <ProtectedRoute isAllowed={isScriptIDPresent}>
-                  <Component />
-                </ProtectedRoute>
-              }
-            />
-          );
-        })}
-      </Route>
-      <Route
-        key='/pos'
-        path="pos"
-        element={
-          <ProtectedRoute isAllowed={isScriptIDPresent}>
-            <POSPage />
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
-  );
-}
-
-export default App;

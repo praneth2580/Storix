@@ -1,24 +1,32 @@
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: 'class', // 'media' or 'class'
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  './index.html',
+  './src/**/*.{js,ts,jsx,tsx}'
+],
+  darkMode: 'class',
   theme: {
     extend: {
-      animation: {
-        spinSlow: "spin 1.2s linear infinite",
-        pingSlow: "ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite",
-        fadeIn: "fadeIn 0.3s ease-out",
+      colors: {
+        primary: 'var(--bg-primary)',
+        secondary: 'var(--bg-secondary)',
+        tertiary: 'var(--bg-tertiary)',
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'text-muted': 'var(--text-muted)',
+        'border-primary': 'var(--border-primary)',
+        'border-secondary': 'var(--border-secondary)',
+        'accent-blue': 'var(--accent-blue)',
+        'accent-green': 'var(--accent-green)',
+        'accent-red': 'var(--accent-red)',
+        'accent-amber': 'var(--accent-amber)',
       },
-      keyframes: {
-        fadeIn: {
-          "0%": { opacity: 0 },
-          "100%": { opacity: 1 },
-        }
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Menlo', 'monospace'],
       }
-    }
+    },
   },
   plugins: [],
 }
