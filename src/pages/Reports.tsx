@@ -13,7 +13,7 @@ import {
     PieChart,
     LineChart,
 } from 'lucide-react'
-import { MiniChart } from './MiniChart'
+import { MiniChart } from '../components/MiniChart'
 type ReportType = 'sales' | 'inventory' | 'purchases' | 'profit' | 'all'
 type ReportData = {
     id: string
@@ -24,93 +24,59 @@ type ReportData = {
     quantity?: number
     status: 'Completed' | 'Pending' | 'Processing'
 }
-const MOCK_REPORT_DATA: ReportData[] = [
-    {
-        id: '1',
-        date: '2024-01-15',
-        type: 'Sales',
-        description: 'Quantum Processor X7',
-        amount: 299.99,
-        quantity: 5,
-        status: 'Completed',
-    },
-    {
-        id: '2',
-        date: '2024-01-15',
-        type: 'Purchase',
-        description: 'Neural Interface V2',
-        amount: 550.0,
-        quantity: 10,
-        status: 'Completed',
-    },
-    {
-        id: '3',
-        date: '2024-01-14',
-        type: 'Sales',
-        description: 'ErgoChair Ultimate',
-        amount: 450.0,
-        quantity: 3,
-        status: 'Completed',
-    },
-    {
-        id: '4',
-        date: '2024-01-14',
-        type: 'Purchase',
-        description: 'SSD 4TB',
-        amount: 180.0,
-        quantity: 20,
-        status: 'Processing',
-    },
-    {
-        id: '5',
-        date: '2024-01-13',
-        type: 'Sales',
-        description: 'Mesh Router Pro',
-        amount: 189.99,
-        quantity: 8,
-        status: 'Completed',
-    },
-    {
-        id: '6',
-        date: '2024-01-13',
-        type: 'Purchase',
-        description: 'Mechanical Keypad',
-        amount: 75.0,
-        quantity: 50,
-        status: 'Completed',
-    },
-    {
-        id: '7',
-        date: '2024-01-12',
-        type: 'Sales',
-        description: 'Smart Home Hub',
-        amount: 89.99,
-        quantity: 12,
-        status: 'Completed',
-    },
-    {
-        id: '8',
-        date: '2024-01-12',
-        type: 'Purchase',
-        description: '4K Ultra Monitor',
-        amount: 380.0,
-        quantity: 15,
-        status: 'Pending',
-    },
-]
+// Redux integration replaces mock data
+// const MOCK_REPORT_DATA... removed
+
+import { useAppSelector, useDataPolling } from '../store/hooks';
+import { fetchSales } from '../store/slices/salesSlice';
+import { fetchPurchases } from '../store/slices/purchasesSlice';
+import { fetchProducts } from '../store/slices/inventorySlice';
+import { Loader2 } from 'lucide-react';
+
 export function Reports() {
+    useDataPolling(fetchSales, 30000);
+    useDataPolling(fetchPurchases, 30000);
+    useDataPolling(fetchProducts, 30000);
+
+    const { items: sales } = useAppSelector(state => state.sales);
+    const { items: purchases } = useAppSelector(state => state.purchases);
+    const { items: products } = useAppSelector(state => state.inventory);
+
     const [reportType, setReportType] = useState<ReportType>('all')
     const [dateFrom, setDateFrom] = useState('2024-01-01')
-    const [dateTo, setDateTo] = useState('2024-01-31')
+    const [dateTo, setDateTo] = useState('2024-12-31') // Extended default range
     const [showExportMenu, setShowExportMenu] = useState(false)
-    // Mock chart data
+    // Mock chart data (still mock for now as we don't have historical data structure in Redux state yet)
     const salesChartData = [45, 52, 48, 65, 58, 72, 68, 75, 82, 78, 88, 95]
     const inventoryChartData = [
         120, 115, 110, 108, 105, 102, 98, 95, 92, 88, 85, 82,
     ]
     const purchaseChartData = [30, 35, 32, 40, 38, 45, 42, 48, 52, 50, 55, 58]
     const profitChartData = [15, 18, 16, 25, 20, 27, 26, 27, 30, 28, 33, 37]
-    const filteredData = MOCK_REPORT_DATA.filter((item) => {
+
+    // Combine data
+    const allTransactions: ReportData[] = [
+        ...sales.map(s => ({
+            id: s.id,
+            date: s.date, // Assuming ISale has date string
+            type: 'Sales',
+            description: `Order #${s.orderId} - ${s.quantity} units`, // Simplified description
+            amount: s.total,
+            quantity: s.quantity,
+            status: 'Completed' as const
+        })),
+        ...purchases.map(p => ({
+            id: p.id,
+            date: p.date,
+            type: 'Purchase',
+            description: `PO ${p.invoiceNumber || ''} - ${p.productId}`,
+            amount: p.total,
+            quantity: p.quantity,
+            status: 'Completed' as const
+        }))
+    ];
+
+    const filteredData = allTransactions.filter((item) => {
         if (reportType !== 'all' && item.type.toLowerCase() !== reportType)
             return false
         return true

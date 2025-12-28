@@ -93,7 +93,15 @@ export function jsonpRequest<T>(
     }).toString();
 
     const script = document.createElement("script");
-    script.src = `${SCRIPT_URL}?${query}`;
+    const scriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
+
+    if (!scriptId) {
+      reject(new Error("VITE_GOOGLE_SCRIPT_ID is missing in localStorage"));
+      return;
+    }
+
+    const scriptUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+    script.src = `${scriptUrl}?${query}`;
     script.async = true;
     script.onerror = () => {
       delete (window as any)[callbackName];

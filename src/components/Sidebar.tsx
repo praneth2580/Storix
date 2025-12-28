@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   LayoutDashboard,
   Package,
@@ -11,116 +11,183 @@ import {
   BoxIcon,
   ScanBarcode,
   FileText,
+  ChevronRight,
+  ChevronLeft,
+  Search,
 } from 'lucide-react'
+
 interface SidebarProps {
   activeTab: string
   onTabChange: (tab: string) => void
   onLogout: () => void
 }
+
+type NavGroup = {
+  title: string;
+  items: {
+    id: string;
+    icon: React.ElementType;
+    label: string;
+  }[];
+}
+
 export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
-  const navItems = [
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
+  const navGroups: NavGroup[] = [
     {
-      id: 'dashboard',
-      icon: LayoutDashboard,
-      label: 'Dashboard',
+      title: 'Operations',
+      items: [
+        { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { id: 'pos', icon: ScanBarcode, label: 'POS Terminal' },
+      ]
     },
     {
-      id: 'pos',
-      icon: ScanBarcode,
-      label: 'POS Terminal',
+      title: 'Inventory',
+      items: [
+        { id: 'products', icon: Package, label: 'Products' },
+        { id: 'stock', icon: BoxIcon, label: 'Stock Manager' },
+        { id: 'suppliers', icon: Users, label: 'Suppliers' },
+      ]
     },
     {
-      id: 'products',
-      icon: Package,
-      label: 'Products',
+      title: 'Finance',
+      items: [
+        { id: 'sales', icon: ShoppingCart, label: 'Sales Entry' },
+        { id: 'purchases', icon: CreditCard, label: 'Purchases' },
+        { id: 'reports', icon: FileText, label: 'Reports' },
+      ]
     },
     {
-      id: 'stock',
-      icon: BoxIcon,
-      label: 'Stock Manager',
-    },
-    {
-      id: 'sales',
-      icon: ShoppingCart,
-      label: 'Sales Entry',
-    },
-    {
-      id: 'purchases',
-      icon: CreditCard,
-      label: 'Purchases',
-    },
-    {
-      id: 'suppliers',
-      icon: Users,
-      label: 'Suppliers',
-    },
-    {
-      id: 'reports',
-      icon: FileText,
-      label: 'Reports',
-    },
-    {
-      id: 'settings',
-      icon: Settings,
-      label: 'Settings',
-    },
-  ]
+      title: 'System',
+      items: [
+        { id: 'settings', icon: Settings, label: 'Settings' },
+      ]
+    }
+  ];
+
   return (
-    <aside className="w-[240px] lg:w-[60px] bg-tertiary border-r border-border-primary flex flex-col items-center py-6 h-full transition-all duration-300">
-      {/* Logo/Brand */}
-      <div className="mb-8 w-8 h-8 bg-accent-blue rounded flex items-center justify-center text-white font-bold text-xs shadow-[0_0_15px_rgba(59,130,246,0.3)] shrink-0">
-        S
+    <aside
+      className={`
+        bg-secondary/95 backdrop-blur-sm border-r border-border-primary 
+        flex flex-col h-full transition-all duration-300 ease-in-out z-50
+        ${isExpanded ? 'w-[260px]' : 'w-[240px] lg:w-[72px]'}
+      `}
+    >
+      {/* Brand Section */}
+      <div className={`h-16 flex items-center px-4 border-b border-border-primary/50 border-gray-500 relative ${isExpanded ? 'justify-between' : 'justify-center lg:justify-center justify-between'}`}>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="w-8 h-8 bg-gradient-to-tr from-accent-blue to-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/20 shrink-0">
+            S
+          </div>
+          <span className={`font-bold text-lg tracking-tight text-text-primary transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'lg:opacity-0 opacity-100'}`}>
+            Storix
+          </span>
+        </div>
+
+        {/* Desktop Collapse Toggle */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-tertiary border border-border-primary rounded-full items-center justify-center text-text-muted hover:text-accent-blue transition-colors shadow-sm z-50"
+        >
+          {isExpanded ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 w-full flex flex-col gap-2 overflow-y-auto no-scrollbar px-2 lg:px-0">
-        {navItems.map((item) => {
-          const isActive = activeTab === item.id
-          return (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={`
-                w-full h-12 flex items-center lg:justify-center relative group transition-all duration-200 rounded-md px-4 lg:px-0
-                ${isActive ? 'text-accent-blue bg-secondary' : 'text-text-muted hover:text-text-primary hover:bg-secondary/50'}
-              `}
-              aria-label={item.label}
-              title={item.label}
-            >
-              {isActive && (
-                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-accent-blue rounded-full lg:rounded-none lg:top-0 lg:bottom-0 lg:left-0" />
-              )}
-              <item.icon
-                size={20}
-                strokeWidth={isActive ? 2.5 : 2}
-                className="shrink-0"
-              />
+      {/* Navigation Groups */}
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 no-scrollbar">
+        {navGroups.map((group, groupIndex) => (
+          <div key={group.title}>
+            {/* Group Title - Only show if expanded or on mobile */}
+            <div className={`
+              px-3 mb-2 text-[10px] font-bold text-text-muted uppercase tracking-wider transition-all duration-300
+              ${isExpanded ? 'opacity-100 translate-x-0' : 'lg:opacity-0 lg:-translate-x-4 opacity-100 translate-x-0'}
+            `}>
+              {group.title}
+            </div>
 
-              {/* Label for mobile drawer */}
-              <span className="ml-3 text-sm font-medium lg:hidden">
-                {item.label}
-              </span>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive = activeTab === item.id;
 
-              {/* Tooltip for desktop collapsed */}
-              <div className="hidden lg:block absolute left-full ml-2 px-2 py-1 bg-secondary text-text-primary text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 border border-border-primary shadow-lg font-mono">
-                {item.label}
-              </div>
-            </button>
-          )
-        })}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onTabChange(item.id)}
+                    onMouseEnter={() => setHoveredItem(item.id)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    className={`
+                      w-full relative group
+                      flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
+                      ${isActive
+                        ? 'bg-accent-blue/10 text-accent-blue shadow-sm'
+                        : 'text-text-muted hover:text-text-primary hover:bg-tertiary/80'}
+                    `}
+                    title={!isExpanded ? item.label : undefined}
+                  >
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-blue rounded-r-md lg:hidden" />
+                    )}
+
+                    <item.icon
+                      size={20}
+                      strokeWidth={isActive ? 2.5 : 2}
+                      className={`shrink-0 transition-transform duration-200 ${hoveredItem === item.id && !isActive ? 'scale-110' : ''}`}
+                    />
+
+                    <span className={`
+                      text-sm font-medium transition-all duration-300 origin-left
+                      ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}
+                    `}>
+                      {item.label}
+                    </span>
+
+                    {/* Active Indicator Dot (Desktop Collapsed) */}
+                    {!isExpanded && isActive && (
+                      <div className="hidden lg:block absolute right-2 w-1.5 h-1.5 rounded-full bg-accent-blue shadow-lg shadow-blue-500/50" />
+                    )}
+
+                    {/* Tooltip for desktop collapsed */}
+                    {!isExpanded && (
+                      <div className="hidden lg:block absolute left-full ml-4 px-2 py-1 bg-popover text-text-primary text-xs rounded shadow-xl border border-border-primary opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                        {item.label}
+                        {/* Arrow */}
+                        <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-popover border-l border-b border-border-primary rotate-45 transform"></div>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom Actions */}
-      <div className="flex flex-col gap-4 w-full items-center mb-4 mt-4 pt-4 border-t border-border-primary shrink-0">
-        <button className="text-text-muted hover:text-text-primary transition-colors relative group">
-          <Bell size={20} />
-          <span className="absolute top-0 right-0 w-2 h-2 bg-accent-red rounded-full border-2 border-tertiary"></span>
+      <div className="p-3 border-t border-border-primary bg-tertiary/30">
+        <button className={`
+            w-full flex items-center px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-tertiary transition-colors group
+            ${isExpanded ? 'justify-start gap-3' : 'justify-center lg:justify-center justify-start gap-3'}
+         `}>
+          <Bell size={20} className="shrink-0" />
+          <span className={`text-sm font-medium transition-all duration-300 ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>
+            Notifications
+          </span>
+          <span className="w-2 h-2 bg-accent-red rounded-full absolute top-3 right-3 lg:static lg:ml-auto"></span>
         </button>
+
         <button
           onClick={onLogout}
-          className="text-text-muted hover:text-accent-red transition-colors group relative"
+          className={`
+             w-full flex items-center px-3 py-2 mt-1 rounded-lg text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-colors group
+             ${isExpanded ? 'justify-start gap-3' : 'justify-center lg:justify-center justify-start gap-3'}
+           `}
         >
-          <LogOut size={20} />
+          <LogOut size={20} className="shrink-0" />
+          <span className={`text-sm font-medium transition-all duration-300 whitespace-nowrap ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>
+            Log Out
+          </span>
         </button>
       </div>
     </aside>
