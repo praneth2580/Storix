@@ -1,4 +1,4 @@
-import { parseAttributes } from "../utils";
+import { parseAttributes } from "../utils/index";
 
 // 📦 Product / Inventory Item
 export interface IProduct {
@@ -67,10 +67,12 @@ export interface ICustomer {
 export interface IStock {
   id: string;
   variantId: string;
-  variant: Variant;
+  productId?: string;
+  variant: IVariant;
+  product?: IProduct;
 
-  // For simple = units  
-  // For measured = weight/volume  
+  // For simple = units
+  // For measured = weight/volume
   // For variants = units per variant
   quantity: number;
   unit: string;
@@ -81,13 +83,13 @@ export interface IStock {
   updatedAt: string;
 }
 
-// Stock
+// Stock Movements
 export interface IStockMovements {
   id: string;
   variantId: string;
 
-  product: Product;
-  variant: Variant;
+  product: IProduct;
+  variant: IVariant;
 
   change: number;
   unit: string;
@@ -105,7 +107,7 @@ export interface IOrder {
   customerId?: string;
   totalAmount: number;
   paymentMethod?: "cash" | "card" | "upi" | "cheque" | "other" | "none" | "bank";
-  
+
   date: string;
   notes: string;
   createdAt: string;
@@ -304,7 +306,9 @@ export class Customer implements ICustomer {
 export class Stock implements IStock {
   id: string;
   variantId: string;
+  productId?: string;
   variant: Variant;
+  product?: Product;
   quantity: number;
   unit: string;
   batchCode: string;
@@ -317,6 +321,7 @@ export class Stock implements IStock {
     this.id = data.id;
     this.variantId = data.variantId;
     this.variant = new Variant(data.variant);
+    if (data.product) this.product = new Product(data.product);
     this.quantity = data.quantity;
     this.unit = data.unit;
     this.batchCode = data.batchCode;
@@ -328,7 +333,7 @@ export class Stock implements IStock {
 
 export class StockMovements implements IStockMovements {
   id: string;
-  
+
   variantId: string;
   product: Product;
   variant: Variant;
@@ -340,7 +345,7 @@ export class StockMovements implements IStockMovements {
   refId: string;
 
   createdAt: string;
-  
+
   constructor(data: IStockMovements) {
     this.id = data.id;
     this.variantId = data.variantId;

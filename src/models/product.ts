@@ -2,26 +2,23 @@
  * @file CRUD functions for Product model using Google Apps Script GET API
  */
 import type { IProduct } from '../types/models.ts';
-import { jsonpRequest } from '../utils.ts';
+import { jsonpRequest } from '../utils/index.ts';
 
 /**
  * GET Products (with optional filters)
  */
+// getProducts
 export const getProducts = async (
   params: Record<string, string> = {}
 ): Promise<IProduct[]> => {
-  return jsonpRequest<IProduct>('Products', {
+  return jsonpRequest<IProduct[]>('Products', {
     action: "get",
     ...params,
   });
 };
 
+// ...
 
-/**
- * CREATE Product  
- * Uses action=create  
- * Sends ?action=create&sheet=Products&data={}
- */
 export const createProduct = async (
   product: Omit<IProduct, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
@@ -31,15 +28,9 @@ export const createProduct = async (
     data: JSON.stringify(product),
   });
 
-  // result is an array → return first item
-  return result[0];
+  return result;
 };
 
-
-/**
- * UPDATE Product  
- * Uses action=update&id=123&data={}
- */
 export const updateProduct = async (
   product: Partial<IProduct> & { id: string }
 ): Promise<{ status: string }> => {
@@ -51,13 +42,9 @@ export const updateProduct = async (
     data: JSON.stringify(rest),
   });
 
-  return result[0]
+  return result;
 };
 
-/**
- * DELETE Product  
- * Uses action=delete&id=123
- */
 export const deleteProduct = async (
   id: string
 ): Promise<{ status: string }> => {
@@ -67,5 +54,5 @@ export const deleteProduct = async (
     id,
   });
 
-  return result[0]
+  return result;
 };

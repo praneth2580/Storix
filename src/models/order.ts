@@ -3,13 +3,13 @@
  * These functions interact with a Google Apps Script backend.
  */
 import type { BatchEntry, BatchResponseItem } from '../types/general';
-import type { Customer, IOrder } from '../types/models';
-import { jsonpRequest, SCRIPT_URL } from '../utils';
+import { Customer, type IOrder } from '../types/models';
+import { jsonpRequest, SCRIPT_URL } from '../utils/index';
 import { getCustomers } from './customers';
 import { getStocks } from './stock';
 
 export const getOrders = async (params: Record<string, string> = {}): Promise<IOrder[]> => {
-  return jsonpRequest<IOrder>("Orders", params);
+  return jsonpRequest<IOrder[]>("Orders", params);
 };
 
 export const createOrder = async (Order: Omit<IOrder, 'id' | 'date'>): Promise<IOrder> => {
@@ -66,7 +66,16 @@ export const createBatchOrder = async (
 ) => {
 
   const variantIds = [...new Set(items.map(item => item.variantId))]
-  const _customer = (await getCustomers({ id: customer.id }))?.[0];
+
+  let _customer = customer;
+  try {
+    const fetched = await getCustomers({ id: customer.id });
+    if (fetched && fetched[0]) {
+      _customer = new Customer(fetched[0]);
+    }
+  } catch (e) {
+    console.warn("Failed to refresh customer data during checkout, using local copy", e);
+  }
   const stock = await getStocks({ variantId: variantIds });
 
   _customer.outstandingBalance = (_customer.outstandingBalance ?? 0) + (totalAmount - totalPayedAmount)
@@ -164,7 +173,7 @@ export const createBatchOrder = async (
     data: JSON.stringify({ operations })  // IMPORTANT!
   });
 
-  const batch = response?.[0];
+  const batch = response;
 
   const orderId = batch.results[0].id;
   const salesItemIds = batch.results.slice(1).map((r: BatchEntry) => r.id);

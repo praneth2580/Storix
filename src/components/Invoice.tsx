@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import jsPDF from "jspdf";
 import domToImage from "dom-to-image-more";
-import { blobToBase64, formatDateForUI } from "../utils";
+import { blobToBase64, formatDateForUI } from "../utils/index";
 
 export interface InvoiceItem {
     name: string;

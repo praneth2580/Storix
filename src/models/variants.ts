@@ -3,7 +3,7 @@
  * Works with Google Apps Script JSONP backend.
  */
 import type { IVariant } from '../types/models.ts';
-import { jsonpRequest } from '../utils.ts';
+import { jsonpRequest } from '../utils/index.ts';
 
 /**
  * GET Variants
@@ -11,16 +11,12 @@ import { jsonpRequest } from '../utils.ts';
 export const getVariants = async (
   params: Record<string, string> = {}
 ): Promise<IVariant[]> => {
-  return jsonpRequest<IVariant>('Variants', {
+  return jsonpRequest<IVariant[]>('Variants', {
     action: "get",
     ...params,
   });
 };
 
-/**
- * CREATE Variant
- * Google Apps Script returns: [{ id: "...", ... }]
- */
 export const createVariant = async (
   variant: Omit<IVariant, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<IVariant> => {
@@ -29,12 +25,9 @@ export const createVariant = async (
     data: JSON.stringify(variant),
   });
 
-  return result[0]; // unwrap array
+  return result;
 };
 
-/**
- * UPDATE Variant
- */
 export const updateVariant = async (
   variant: Partial<IVariant> & { id: string }
 ): Promise<IVariant> => {
@@ -43,17 +36,14 @@ export const updateVariant = async (
     data: JSON.stringify(variant),
   });
 
-  return result[0];
+  return result;
 };
 
-/**
- * DELETE Variant
- */
 export const deleteVariant = async (id: string): Promise<{ success: boolean }> => {
   const result = await jsonpRequest<{ success: boolean }>('Variants', {
     action: "delete",
     id,
   });
 
-  return result[0];
+  return result;
 };

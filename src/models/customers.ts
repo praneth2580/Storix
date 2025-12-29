@@ -3,7 +3,7 @@
  * Works with Google Apps Script JSONP backend.
  */
 import type { ICustomer } from '../types/models.ts';
-import { jsonpRequest } from '../utils.ts';
+import { jsonpRequest } from '../utils/index.ts';
 
 /**
  * GET Customers
@@ -11,7 +11,7 @@ import { jsonpRequest } from '../utils.ts';
 export const getCustomers = async (
   params: Record<string, string> = {}
 ): Promise<ICustomer[]> => {
-  return jsonpRequest<ICustomer>('Customers', {
+  return jsonpRequest<ICustomer[]>('Customers', {
     action: "get",
     ...params,
   });
@@ -22,29 +22,31 @@ export const getCustomers = async (
  * Google Apps Script returns: [{ id: "...", ... }]
  */
 export const createCustomer = async (
-  Customer: Omit<ICustomer, 'id' | 'createdAt' | 'updatedAt'>
+  customer: Omit<ICustomer, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<ICustomer> => {
   const result = await jsonpRequest<ICustomer>('Customers', {
     action: "create",
-    data: JSON.stringify(Customer),
+    data: JSON.stringify(customer),
   });
 
-  return result[0]; // unwrap array
+  return result;
 };
 
 /**
  * UPDATE Customer
  */
 export const updateCustomer = async (
-  Customer: Partial<ICustomer> & { id: string }
+  customer: Partial<ICustomer> & { id: string }
 ): Promise<ICustomer> => {
+  const { id, ...rest } = customer;
+
   const result = await jsonpRequest<ICustomer>('Customers', {
     action: "update",
-    id: Customer.id,
-    data: JSON.stringify(Customer),
+    id,
+    data: JSON.stringify(rest),
   });
 
-  return result[0];
+  return result;
 };
 
 /**
@@ -56,5 +58,5 @@ export const deleteCustomer = async (id: string): Promise<{ success: boolean }> 
     id,
   });
 
-  return result[0];
+  return result;
 };

@@ -2,7 +2,7 @@
  * @file CRUD functions for Purchase model using Google Apps Script GET API
  */
 import type { IPurchase } from '../types/models';
-import { jsonpRequest } from '../utils';
+import { jsonpRequest } from '../utils/index';
 
 /**
  * GET Purchases (with optional filters)
@@ -10,18 +10,12 @@ import { jsonpRequest } from '../utils';
 export const getPurchases = async (
   params: Record<string, string> = {}
 ): Promise<IPurchase[]> => {
-  return jsonpRequest<IPurchase>('Purchases', {
+  return jsonpRequest<IPurchase[]>('Purchases', {
     action: "get",
     ...params,
   });
 };
 
-
-/**
- * CREATE Purchase  
- * Uses action=create  
- * Sends ?action=create&sheet=Purchases&data={}
- */
 export const createPurchase = async (
   purchase: Omit<IPurchase, 'id' | 'date' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
@@ -31,14 +25,9 @@ export const createPurchase = async (
     data: JSON.stringify(purchase),
   });
 
-  return result[0]; // API always returns array
+  return result;
 };
 
-
-/**
- * UPDATE Purchase  
- * Uses action=update&id=123&data={}
- */
 export const updatePurchase = async (
   purchase: Partial<IPurchase> & { id: string }
 ): Promise<{ status: string }> => {
@@ -51,14 +40,9 @@ export const updatePurchase = async (
     data: JSON.stringify(rest),
   });
 
-  return result[0];
+  return result;
 };
 
-
-/**
- * DELETE Purchase  
- * Uses action=delete&id=123
- */
 export const deletePurchase = async (
   id: string
 ): Promise<{ status: string }> => {
@@ -68,5 +52,5 @@ export const deletePurchase = async (
     id,
   });
 
-  return result[0];
+  return result;
 };

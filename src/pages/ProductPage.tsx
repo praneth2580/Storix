@@ -4,25 +4,30 @@ import Table from '../components/Table';
 import Form from '../components/Form';
 import type { FormField } from '../components/Form';
 import { Product, Variant, type IProduct, type IVariant } from '../types/models';
-import { getProducts, createProduct, deleteProduct, updateProduct } from '../models/product';
-import { createVariant, deleteVariant, getVariants, updateVariant } from '../models/variants';
+import { createProduct, deleteProduct, updateProduct } from '../models/product';
+import { createVariant, deleteVariant, updateVariant } from '../models/variants';
 import Modal from '../components/Modal';
 import { ConfirmModal, type ModalData } from '../components/ConfirmModal';
-import { formatOptions } from '../utils';
-import Loader from '../components/Loader';
+import { formatOptions } from '../utils/index';
+import { setLoading } from '../store/slices/uiSlice';
+import { mergeChanges, removeData } from '../store/slices/dataSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '../store';
 
 const ProductPage = () => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(true);
+    // Redux Selector
+    const productsMap = useSelector((state: RootState) => state.data.Products);
+    const products = Object.values(productsMap || {}).map((p: any) => new Product(p));
+
+    const loading = useSelector((state: RootState) => state.ui.loading);
+    const dispatch = useDispatch();
     const [error, setError] = useState<string | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
     const [showModal, setShowModal] = useState<boolean>(false);
     const [editProduct, setEditProduct] = useState<Product | null>(null);
     const [confirmModalData, setConfirmModalData] = useState<ModalData | null>(null);
 
-    useEffect(() => {
-        loadProducts();
-    }, []);
+    // Initial load handled by SyncEngine, removed useEffect loadProducts
 
     useEffect(() => {
         if (editProduct != null && !showModal) setShowModal(true);
@@ -31,19 +36,6 @@ const ProductPage = () => {
     useEffect(() => {
         if (!showModal) setEditProduct(null);
     }, [showModal]);
-
-    const loadProducts = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const fetchedProducts = await getProducts();
-            setProducts(fetchedProducts.map(p => new Product(p)));
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load products');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const columns = [
         { header: 'ID', accessor: 'id' as keyof Product },
@@ -100,7 +92,7 @@ const ProductPage = () => {
     const handleAddProduct = async (formData: Partial<IProduct>) => {
         try {
             setError(null);
-            setLoading(true);
+            dispatch(setLoading(true));
             const productData = {
                 name: formData.name || '',
                 category: formData.category || '',
@@ -113,18 +105,24 @@ const ProductPage = () => {
                 defaultSellingPrice: formData.defaultSellingPrice || 0
             };
 
-            await createProduct(productData);
-            await loadProducts(); // Refresh the list
+            const result = await createProduct(productData);
+            dispatch(mergeChanges({
+                table: 'Products',
+                payload: { rows: [result], fullRefresh: false }
+            }));
+
             setShowModal(false);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to add product');
+        } finally {
+            dispatch(setLoading(false));
         }
     };
 
     const handleUpdateProduct = async (formData: Partial<IProduct>) => {
         try {
             setError(null);
-            setLoading(true);
+            dispatch(setLoading(true));
             const productData = {
                 id: formData.id || '',
                 name: formData.name || '',
@@ -140,11 +138,17 @@ const ProductPage = () => {
                 updatedAt: new Date().toISOString()
             };
 
-            await updateProduct(productData);
-            await loadProducts(); // Refresh the list
+            const result = await updateProduct(productData);
+            dispatch(mergeChanges({
+                table: 'Products',
+                payload: { rows: [result], fullRefresh: false }
+            }));
+
             setShowModal(false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to add product');
+            setError(err instanceof Error ? err.message : 'Failed to update product');
+        } finally {
+            dispatch(setLoading(false));
         }
     };
 
@@ -159,12 +163,14 @@ const ProductPage = () => {
     const handleDeleteProduct = async (id: string) => {
         try {
             setError(null);
-            setLoading(true);
+            dispatch(setLoading(true));
             setConfirmModalData(null);
             await deleteProduct(id);
-            await loadProducts(); // Refresh the list
+            dispatch(removeData({ table: 'Products', id }));
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to delete product');
+        } finally {
+            dispatch(setLoading(false));
         }
     };
 
@@ -179,7 +185,6 @@ const ProductPage = () => {
 
     return (
         <>
-            <Loader loading={loading} />
             <div className="container mx-auto p-4">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-2xl font-bold">Product</h1>
@@ -246,15 +251,16 @@ const ProductPage = () => {
 };
 
 const VariantsPage = ({ product_id }: { product_id: string }) => {
-    const [variants, setVariants] = useState<Variant[]>([]);
-    const [loading, setLoading] = useState(true);
+    // Redux Selector
+    const variantsMap = useSelector((state: RootState) => state.data.Variants);
+    const variants = Object.values(variantsMap || {})
+        .filter((v: any) => v.productId === product_id)
+        .map((p: any) => new Variant(p));
+
     const [editVariant, setEditVariant] = useState<Variant | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
-
-    useEffect(() => {
-        loadVariants();
-    }, []);
+    const dispatch = useDispatch();
 
     useEffect(() => {
         if (editVariant != null && !showForm) setShowForm(true);
@@ -263,19 +269,6 @@ const VariantsPage = ({ product_id }: { product_id: string }) => {
     useEffect(() => {
         if (!showForm) setEditVariant(null);
     }, [showForm]);
-
-    const loadVariants = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const fetchedVariants = await getVariants({ 'productId': product_id });
-            setVariants(fetchedVariants.map(p => new Variant(p)));
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load products');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const columns = [
         { header: 'ID', accessor: 'id' as keyof Variant },
@@ -320,7 +313,7 @@ const VariantsPage = ({ product_id }: { product_id: string }) => {
     const handleAddProduct = async (formData: Partial<IVariant>) => {
         try {
             setError(null);
-            setLoading(true);
+            dispatch(setLoading(true));
             const variantData = {
                 productId: product_id,
                 sku: formData.sku,
@@ -331,18 +324,23 @@ const VariantsPage = ({ product_id }: { product_id: string }) => {
                 updatedAt: new Date().toISOString()
             };
 
-            await createVariant(variantData);
-            await loadVariants(); // Refresh the list
+            const result = await createVariant(variantData);
+            dispatch(mergeChanges({
+                table: 'Variants',
+                payload: { rows: [result], fullRefresh: false }
+            }));
             setShowForm(false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to add product');
+            setError(err instanceof Error ? err.message : 'Failed to add variant');
+        } finally {
+            dispatch(setLoading(false));
         }
     };
 
     const handleUpdateProduct = async (formData: Partial<IVariant>) => {
         try {
             setError(null);
-            setLoading(true);
+            dispatch(setLoading(true));
             const variantData = {
                 id: formData.id || '',
                 productId: product_id,
@@ -354,22 +352,29 @@ const VariantsPage = ({ product_id }: { product_id: string }) => {
                 updatedAt: new Date().toISOString()
             };
 
-            await updateVariant(variantData);
-            await loadVariants(); // Refresh the list
+            const result = await updateVariant(variantData);
+            dispatch(mergeChanges({
+                table: 'Variants',
+                payload: { rows: [result], fullRefresh: false }
+            }));
             setShowForm(false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to add product');
+            setError(err instanceof Error ? err.message : 'Failed to update variant');
+        } finally {
+            dispatch(setLoading(false));
         }
     };
 
     const handleDeleteVariant = async (id: string) => {
         try {
             setError(null);
-            setLoading(true);
+            dispatch(setLoading(true));
             await deleteVariant(id);
-            await loadVariants(); // Refresh the list
+            dispatch(removeData({ table: 'Variants', id }));
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete product');
+            setError(err instanceof Error ? err.message : 'Failed to delete variant');
+        } finally {
+            dispatch(setLoading(false));
         }
     };
 
@@ -416,18 +421,6 @@ const VariantsPage = ({ product_id }: { product_id: string }) => {
                             {error}
                         </div>
                     )}
-
-                    {/* {loading ? (
-                        <div className="flex justify-center items-center h-32">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                        </div>
-                    ) : (
-                        <Table
-                            columns={columns}
-                            data={variants}
-                        />
-                    )} */}
-                    <Loader loading={loading} />
                     <Table
                         columns={columns}
                         data={variants}

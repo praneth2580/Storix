@@ -2,7 +2,7 @@
  * @file CRUD functions for Sale model using Google Apps Script GET API
  */
 import type { ISale } from '../types/models';
-import { jsonpRequest } from '../utils';
+import { jsonpRequest } from '../utils/index';
 
 
 /**
@@ -33,16 +33,10 @@ export const getSales = async (
     }
   });
 
-  return jsonpRequest<ISale>("Sales", queryParams);
+  return jsonpRequest<ISale[]>("Sales", queryParams);
 };
 
 
-
-/**
- * CREATE Sale  
- * Uses action=create  
- * Sends ?action=create&sheet=Sales&data={}
- */
 export const createSale = async (
   sale: Omit<ISale, 'id' | 'date' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
@@ -52,14 +46,10 @@ export const createSale = async (
     data: JSON.stringify(sale),
   });
 
-  return result[0];
+  return result;
 };
 
 
-/**
- * UPDATE Sale  
- * Uses action=update&id=123&data={}
- */
 export const updateSale = async (
   sale: Partial<ISale> & { id: string }
 ): Promise<{ status: string }> => {
@@ -72,14 +62,10 @@ export const updateSale = async (
     data: JSON.stringify(rest),
   });
 
-  return result[0];
+  return result;
 };
 
 
-/**
- * DELETE Sale  
- * Uses action=delete&id=123
- */
 export const deleteSale = async (
   id: string
 ): Promise<{ status: string }> => {
@@ -89,5 +75,5 @@ export const deleteSale = async (
     id,
   });
 
-  return result[0];
+  return result;
 };

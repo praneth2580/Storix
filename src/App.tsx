@@ -4,9 +4,13 @@ import { routeConfig } from './routes';
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/POSPage';
 import DarkModeToggle from './components/DarkModeToggle';
+import Loader from './components/Loader';
+import { useSelector } from 'react-redux';
+import type { RootState } from './store';
 
 const Layout = () => {
   const [isNavOpen, setIsNavOpen] = useState(false);
+  const loading = useSelector((state: RootState) => state.ui.loading);
 
   const fullscreen_routes = routeConfig.filter(route => route.fullScreen).map(route => route.path);
   const location = useLocation()
@@ -23,6 +27,8 @@ const Layout = () => {
       className={`flex h-screen bg-gray-100 dark:bg-gray-950 ${isNavOpen ? "overflow-hidden" : ""
         }`}
     >
+      <Loader loading={loading} />
+
       {/* Mobile Top Bar */}
       <div className={`md:hidden flex items-center justify-between p-2 
         bg-white dark:bg-gray-900

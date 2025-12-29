@@ -1,4 +1,4 @@
-import { useDarkMode } from "../utils";
+import { useDarkMode } from "../utils/index";
 
 export default function DarkModeToggle() {
   const [isDark, setIsDark] = useDarkMode();

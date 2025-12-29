@@ -2,7 +2,7 @@
  * @file CRUD functions for Product model using Google Apps Script GET API
  */
 import type { IStock } from '../types/models.ts';
-import { jsonpRequest } from '../utils.ts';
+import { jsonpRequest } from '../utils/index.ts';
 
 /**
  * GET Stock (with optional filters)
@@ -16,17 +16,12 @@ export const getStocks = async (
     finalParams[key] = Array.isArray(value) ? value.join(",") : value;
   });
 
-  return jsonpRequest<IStock>('Stock', {
+  return jsonpRequest<IStock[]>('Stock', {
     action: "get",
     ...finalParams,
   });
 };
 
-/**
- * CREATE Product  
- * Uses action=create  
- * Sends ?action=create&sheet=Stock&data={}
- */
 export const createStock = async (
   stock: Omit<IStock, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
@@ -36,15 +31,9 @@ export const createStock = async (
     data: JSON.stringify(stock),
   });
 
-  // result is an array → return first item
-  return result[0];
+  return result;
 };
 
-
-/**
- * UPDATE Product  
- * Uses action=update&id=123&data={}
- */
 export const updateStock = async (
   stock: Partial<IStock> & { id: string }
 ): Promise<{ status: string }> => {
@@ -56,13 +45,9 @@ export const updateStock = async (
     data: JSON.stringify(rest),
   });
 
-  return result[0]
+  return result;
 };
 
-/**
- * DELETE Product  
- * Uses action=delete&id=123
- */
 export const deleteStock = async (
   id: string
 ): Promise<{ status: string }> => {
@@ -72,5 +57,5 @@ export const deleteStock = async (
     id,
   });
 
-  return result[0]
+  return result;
 };

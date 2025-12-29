@@ -15,7 +15,7 @@ import AutoCompleteSearch from "../components/AutoCompleteSearch";
 import { createCustomer, getCustomers, updateCustomer } from "../models/customers";
 import { Toggle } from "../components/Toggle";
 import { createBatchOrder } from "../models/order";
-import { openNewTab } from "../utils";
+import { openNewTab } from "../utils/index";
 import { getStocks } from "../models/stock";
 import type { PaymentMethodType } from "../types/general";
 
@@ -761,7 +761,7 @@ const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: 
     const [fullOutstandingPayment, setFullOutstandingPayment] = useState<boolean>(false);
     const [totalPaymentAmount, setTotalPaymentAmount] = useState(totalOutStanding);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('cash');
-    const paymentMethodOptions: { label: string, value: PaymentMethodType } = [
+    const paymentMethodOptions: { label: string, value: PaymentMethodType }[] = [
         { label: "Cash", value: "cash" },
         { label: "Card", value: "card" },
         { label: "Cheque", value: "cheque" },
@@ -797,10 +797,12 @@ const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: 
 
             const { orderId } = await createBatchOrder(order, items, _customer, total, totalPaymentAmount);
             setLoading(false);
-            onSuccess(orderId);
-
+            if (orderId) onSuccess(orderId);
         } catch (error) {
-            console.log(error);
+            console.error("Checkout failed:", error);
+            alert("Checkout failed. Please try again. " + (error instanceof Error ? error.message : ""));
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -869,7 +871,7 @@ const PaymentModal = ({ show, onClose, customer, cart, setLoading, onSuccess }: 
             <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
                 {paymentMethodOptions.map(payMethod => <button
                     key={payMethod.value}
-                    onClick={() => setPaymentMethod((payMethod.value ?? "other") as pay)}
+                    onClick={() => setPaymentMethod((payMethod.value ?? "other") as PaymentMethodType)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium flex-shrink-0 ${paymentMethod === payMethod.value
                         ? "text-white bg-blue-500 dark:bg-blue-600"
                         : "bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700"

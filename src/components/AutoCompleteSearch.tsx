@@ -35,7 +35,7 @@ export default function AutoCompleteSearch<T>({
 
   const filtered = options.filter((o) =>
     searchKeys.some((key) =>
-      String(o[key] ?? "")
+      String((o as any)[key] ?? "")
         .toLowerCase()
         .includes(query.toLowerCase())
     )

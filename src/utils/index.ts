@@ -1,105 +1,58 @@
 import React, { useEffect, useState } from "react";
-import type { OptionData } from "./components/Form";
+import type { OptionData } from "../components/Form";
 
 export const SCRIPT_ID = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
 export const SCRIPT_URL = `https://script.google.com/macros/s/${SCRIPT_ID}/exec`;
 
 
-// export function jsonpRequest<T>(
-//   sheet: string,
-//   params: Record<string, string> = {}
-// ): Promise<T[]> {
-//   return new Promise((resolve, reject) => {
-//     if (typeof document === "undefined") {
-//       reject("Not running in a browser environment");
-//       return;
-//     }
+// Global queue to serialize JSONP requests because backend uses a fixed callback name "storix"
+let jsonpQueue: Promise<any> = Promise.resolve();
 
-//     const callbackName = `jsonp_cb_${Date.now()}_${Math.floor(
-//       Math.random() * 1000
-//     )}`;
-//     (window as any)[callbackName] = (response: any) => {
-//       try {
-//         // console.log(`✅ JSONP Response [${sheet}]`, response);
-//         resolve(Array.isArray(response) ? response : response.data || []);
-//       } catch (err) {
-//         reject(err);
-//       } finally {
-//         delete (window as any)[callbackName];
-//         if (script.parentNode) script.parentNode.removeChild(script);
-//       }
-//     };
+export function jsonp<T = any>(url: string): Promise<T> {
+  // Chain the request to the end of the queue
+  const request = jsonpQueue.then(() => {
+    return new Promise<T>((resolve, reject) => {
+      const callbackName = "storix";
 
-//     const query = new URLSearchParams({
-//       sheet,
-//       callback: callbackName,
-//       ...params,
-//     }).toString();
-
-//     const script = document.createElement("script");
-//     script.src = `${SCRIPT_URL}?${query}`;
-//     script.async = true;
-//     script.onerror = () => {
-//       delete (window as any)[callbackName];
-//       reject(new Error(`JSONP request failed for ${sheet}`));
-//     };
-
-//     document.body.appendChild(script);
-//   });
-// }
-export function jsonpRequest<T>(
-  sheet: string,
-  params: Record<string, string> = {}
-): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    if (typeof document === "undefined") {
-      reject("Not running in a browser environment");
-      return;
-    }
-
-    const callbackName = `jsonp_cb_${Date.now()}_${Math.floor(
-      Math.random() * 1000
-    )}`;
-
-    (window as any)[callbackName] = (response: any) => {
-      try {
-        let data = response;
-
-        // Handle wrapped format: { data: [...] }
-        if (response && response.data) {
-          data = response.data;
-        }
-
-        // Normalize to array (THIS FIXES YOUR ISSUE)
-        const arr = Array.isArray(data) ? data : [data];
-
-        resolve(arr);
-      } catch (err) {
-        reject(err);
-      } finally {
+      // Cleanup function to ensure we leave clean state and remove script
+      const cleanup = () => {
         delete (window as any)[callbackName];
         if (script.parentNode) script.parentNode.removeChild(script);
-      }
-    };
+      };
 
-    const query = new URLSearchParams({
-      sheet,
-      callback: callbackName,
-      ...params,
-    }).toString();
+      (window as any)[callbackName] = (data: T) => {
+        cleanup();
+        resolve(data);
+      };
 
-    const script = document.createElement("script");
-    script.src = `${SCRIPT_URL}?${query}`;
-    script.async = true;
-    script.onerror = () => {
-      delete (window as any)[callbackName];
-      reject(new Error(`JSONP request failed for ${sheet}`));
-    };
+      const script = document.createElement("script");
+      script.src = `${url}&callback=${callbackName}`;
+      script.onerror = (err) => {
+        cleanup();
+        reject(err);
+      };
 
-    document.body.appendChild(script);
+      document.body.appendChild(script);
+    });
   });
+
+  // Update queue to wait for this request (and ignore its error so checks keep processing)
+  jsonpQueue = request.catch(() => { });
+
+  return request;
 }
 
+export async function jsonpRequest<T>(sheet: string, params: Record<string, any> = {}): Promise<T> {
+  const searchParams = new URLSearchParams();
+  searchParams.append("sheet", sheet);
+
+  Object.entries(params).forEach(([key, value]) => {
+    searchParams.append(key, String(value));
+  });
+
+  const url = `${SCRIPT_URL}?${searchParams.toString()}`;
+  return jsonp<T>(url);
+}
 
 export function parseAttributes(input: string): Record<string, string> {
   try {

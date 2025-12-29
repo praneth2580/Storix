@@ -4,7 +4,7 @@ import {
   useEmailChange,
   useGenericChange,
   usePhoneChange,
-} from "../utils";
+} from "../utils/index";
 import { JSONInput } from "./JSONInput";
 
 export interface OptionData {
