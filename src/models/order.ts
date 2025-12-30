@@ -4,50 +4,54 @@
  */
 import type { BatchEntry, BatchResponseItem } from '../types/general';
 import type { Customer, IOrder } from '../types/models';
-import { jsonpRequest, SCRIPT_URL } from '../utils';
+import { jsonpRequest } from '../utils';
 import { getCustomers } from './customers';
 import { getStocks } from './stock';
 
 export const getOrders = async (params: Record<string, string> = {}): Promise<IOrder[]> => {
-  return jsonpRequest<IOrder>("Orders", params);
+  const data = await jsonpRequest<IOrder[]>("Orders", {
+    action: "get",
+    ...params,
+  });
+
+  return data.map(order => ({
+    ...order,
+    id: String(order.id),
+    customerId: order.customerId ? String(order.customerId) : undefined
+  }));
 };
 
-export const createOrder = async (Order: Omit<IOrder, 'id' | 'date'>): Promise<IOrder> => {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheet: 'Orders', ...Order }),
+export const createOrder = async (Order: Omit<IOrder, 'id' | 'date' | 'createdAt' | 'updatedAt'>): Promise<IOrder> => {
+  const result = await jsonpRequest<{ id: string, now: string }>("Orders", {
+    action: "create",
+    data: JSON.stringify(Order),
   });
-  if (!response.ok) throw new Error('Failed to create Order');
-  const { data } = await response.json();
-  return data as IOrder;
+
+  return { ...Order, id: result.id, date: result.now, createdAt: result.now, updatedAt: result.now } as IOrder;
 };
 
 export const updateOrder = async (Order: Partial<IOrder> & { id: string }): Promise<IOrder> => {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheet: 'Orders', id: Order.id, data: JSON.stringify(Order) }),
+  const result = await jsonpRequest<{ status: string, now: string }>("Orders", {
+    action: "update",
+    id: Order.id,
+    data: JSON.stringify(Order),
   });
-  if (!response.ok) throw new Error('Failed to update Order');
-  const { data } = await response.json();
-  return data as IOrder;
+
+  return { ...Order, updatedAt: result.now } as IOrder;
 };
 
 export const deleteOrder = async (id: string): Promise<{ success: boolean }> => {
-  const query = new URLSearchParams({ sheet: 'Orders', id }).toString();
-  const response = await fetch(`${SCRIPT_URL}?${query}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error('Failed to delete Order');
-  return await response.json();
+  return jsonpRequest<{ success: boolean }>("Orders", {
+    action: "delete",
+    id,
+  });
 };
 
 /**
- * Creates an order + multiple sales items in a single batch request.
- * @param orderData         The order header (customer, totals, etc.)
- * @param items             Array of sales items (variantId, qty, price, etc.)
- * @param customer          The Customer to whom the order belongs
- * @param totalAmount       The Total Amount of the Order
- * @param totalPayedAmount  The Amount the Customer payed
+ * Creates an order + multiple sales items.
+ * Since backend removed __REF support, we must:
+ * 1. Create Order explicitly.
+ * 2. Use ID to create dependents via Batch.
  */
 export const createBatchOrder = async (
   orderData: Omit<IOrder, 'id' | 'date' | 'createdAt' | 'updatedAt'>,
@@ -66,7 +70,7 @@ export const createBatchOrder = async (
 ) => {
 
   const variantIds = [...new Set(items.map(item => item.variantId))]
-  const _customer = (await getCustomers({ id: customer.id }))?.[0];
+  const _customer = (await getCustomers({ id: customer.id }))?.[0]; // getCustomers returns array
   const stock = await getStocks({ variantId: variantIds });
 
   _customer.outstandingBalance = (_customer.outstandingBalance ?? 0) + (totalAmount - totalPayedAmount)
@@ -85,55 +89,50 @@ export const createBatchOrder = async (
     }
   }).filter(item => item != null);
 
+  // 1. Create Order First
+  const createdOrder = await createOrder(orderData);
+  const orderId = createdOrder.id;
+  const now = createdOrder.createdAt;
+
   const operations: unknown[] = [];
 
-  // A. Order Create (index 0)
-  operations.push({
-    type: "create",
-    sheet: "Orders",
-    data: {
-      ...orderData,
-      createdAt: new Date().toISOString(),
-      date: new Date().toISOString()
-    }
-  });
-
-  // B. Sales Rows
+  // B. Sales Rows (linked to orderId)
   _items.forEach(item => {
     operations.push({
-      type: "create",
+      action: "create", // Use 'action', not 'type'
       sheet: "Sales",
       data: {
         ...item,
-        orderId: "__REF(0).id__",
-        date: new Date().toISOString()
+        orderId: orderId, // Use real ID
+        date: now
       }
     });
   });
 
   // C. Customer
   operations.push({
-    type: "update",
+    action: "update",
     sheet: "Customers",
-    id: customer.id,
+    id: customer.id, // ID at top level for update
     data: {
+      id: customer.id, // ID inside data too for safety
       ..._customer,
-      updatedAt: new Date().toISOString()
+      updatedAt: now
     }
   })
 
   // D. StockMovements Rows
   _items.forEach(item => {
     operations.push({
-      type: "create",
+      action: "create",
       sheet: "StockMovements",
       data: {
         variantId: item.variantId,
         change: item.quantity * -1,
         unit: item.unit,
         type: 'sale',
-        refId: "__REF(0).id__",
-        createdAt: new Date().toISOString()
+        refId: orderId,
+        createdAt: now
       }
     });
   });
@@ -144,35 +143,37 @@ export const createBatchOrder = async (
     if (!item) return;
 
     operations.push({
-      type: "update",
+      action: "update",
       sheet: "Stock",
       id: item.stock_id,
       data: {
+        id: item.stock_id,
         variantId: s.variantId,
         quantity: (s.quantity - item.quantity),
         unit: s.unit,
         batchCode: s.batchCode,
         metadata: s.metadata,
         location: s.location,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       }
     });
   });
 
-  const response = await jsonpRequest<BatchResponseItem>('Orders', {
+  // Send batch for the rest
+  const response = await jsonpRequest<{ results: any[] }>('Orders', {
     action: "batch",
-    data: JSON.stringify({ operations })  // IMPORTANT!
+    data: JSON.stringify({ operations })
   });
 
-  const batch = response?.[0];
-
-  const orderId = batch.results[0].id;
-  const salesItemIds = batch.results.slice(1).map((r: BatchEntry) => r.id);
+  // Construct return similar to before
+  const salesItemIds = response.results
+    .filter((r: any) => r.sheet === 'Sales' && r.status === 'created')
+    .map((r: any) => r.id);
 
   return {
     orderId,
     salesItemIds,
-    raw: batch
+    raw: response
   };
 };
 

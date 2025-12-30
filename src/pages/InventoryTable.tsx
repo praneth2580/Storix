@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, MoreHorizontal, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAppSelector, useDataPolling } from '../store/hooks';
-import { fetchProducts } from '../store/slices/inventorySlice';
-import { IProduct } from '../types/models';
+import { fetchProducts, InventoryProduct } from '../store/slices/inventorySlice';
 
-type SortField = keyof IProduct;
+type SortField = 'name' | 'category' | 'barcode' | 'quantity' | 'price' | 'value';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -26,9 +25,22 @@ export function InventoryTable() {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      setSortField(field as SortField);
+      setSortField(field);
       setSortDirection('desc');
     }
+  };
+
+  // Helper functions to get calculated values
+  const getPrice = (item: InventoryProduct): number => {
+    return item.variants?.[0]?.price || 0;
+  };
+
+  const getQuantity = (item: InventoryProduct): number => {
+    return item.totalStock || 0;
+  };
+
+  const getValue = (item: InventoryProduct): number => {
+    return getQuantity(item) * getPrice(item);
   };
 
   // Helper to safely access properties for sorting/filtering
@@ -39,17 +51,43 @@ export function InventoryTable() {
     return matchesCategory && matchesSearch;
   })
     .sort((a, b) => {
-      // Logic adaptation for IProduct structure
-      const aValue = a[sortField as keyof IProduct];
-      const bValue = b[sortField as keyof IProduct];
+      let aValue: string | number;
+      let bValue: string | number;
 
-      // Handle missing quantity/price in simple IProduct if needed, strictly speaking these mock products have them
-      // For now we assume the mock data shape aligns or we cast
+      switch (sortField) {
+        case 'name':
+          aValue = a.name;
+          bValue = b.name;
+          break;
+        case 'category':
+          aValue = a.category;
+          bValue = b.category;
+          break;
+        case 'barcode':
+          aValue = a.barcode || '';
+          bValue = b.barcode || '';
+          break;
+        case 'quantity':
+          aValue = getQuantity(a);
+          bValue = getQuantity(b);
+          break;
+        case 'price':
+          aValue = getPrice(a);
+          bValue = getPrice(b);
+          break;
+        case 'value':
+          aValue = getValue(a);
+          bValue = getValue(b);
+          break;
+        default:
+          aValue = a.name;
+          bValue = b.name;
+      }
 
       if (typeof aValue === 'string' && typeof bValue === 'string') {
         return sortDirection === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
       }
-      // Fallback for numbers
+      // Numbers
       return sortDirection === 'asc'
         ? (Number(aValue) - Number(bValue))
         : (Number(bValue) - Number(aValue));
@@ -60,6 +98,14 @@ export function InventoryTable() {
     if (qty < 10) return 'text-accent-red';
     if (qty <= 20) return 'text-accent-amber';
     return 'text-text-primary';
+  };
+
+  const getStatusColor = (item: InventoryProduct) => {
+    const qty = getQuantity(item);
+    if (qty === 0) return 'bg-accent-red';
+    const minStock = item.minStockLevel || 10;
+    if (qty < minStock) return 'bg-accent-red';
+    return 'bg-accent-green';
   };
   const SortIcon = ({
     field
@@ -115,18 +161,20 @@ export function InventoryTable() {
                 Category <SortIcon field="category" />
               </div>
             </th>
-            <th className="p-3 border-b border-border-primary text-[10px] uppercase tracking-wider text-text-muted font-semibold group text-right">
+            <th className="p-3 border-b border-border-primary text-[10px] uppercase tracking-wider text-text-muted font-semibold cursor-pointer hover:text-text-primary group text-right" onClick={() => handleSort('quantity')}>
               <div className="flex items-center justify-end">
-                Qty
+                Qty <SortIcon field="quantity" />
               </div>
             </th>
-            <th className="p-3 border-b border-border-primary text-[10px] uppercase tracking-wider text-text-muted font-semibold cursor-pointer hover:text-text-primary group text-right" onClick={() => handleSort('defaultSellingPrice')}>
+            <th className="p-3 border-b border-border-primary text-[10px] uppercase tracking-wider text-text-muted font-semibold cursor-pointer hover:text-text-primary group text-right" onClick={() => handleSort('price')}>
               <div className="flex items-center justify-end">
-                Price <SortIcon field="defaultSellingPrice" />
+                Price <SortIcon field="price" />
               </div>
             </th>
-            <th className="p-3 border-b border-border-primary text-[10px] uppercase tracking-wider text-text-muted font-semibold text-right">
-              Value
+            <th className="p-3 border-b border-border-primary text-[10px] uppercase tracking-wider text-text-muted font-semibold cursor-pointer hover:text-text-primary group text-right" onClick={() => handleSort('value')}>
+              <div className="flex items-center justify-end">
+                Value <SortIcon field="value" />
+              </div>
             </th>
             <th className="p-3 border-b border-border-primary text-[10px] uppercase tracking-wider text-text-muted font-semibold text-center">
               Status
@@ -139,6 +187,12 @@ export function InventoryTable() {
         <tbody className="divide-y divide-border-primary">
           {loading ? (
             <tr><td colSpan={9} className="p-8 text-center text-text-muted"><Loader2 className="animate-spin mx-auto mb-2" /> Loading inventory...</td></tr>
+          ) : error ? (
+            <tr><td colSpan={9} className="p-8 text-center text-accent-red">
+              <AlertTriangle className="mx-auto mb-2" size={24} />
+              <div>Error loading inventory</div>
+              <div className="text-xs mt-1">{error}</div>
+            </td></tr>
           ) : filteredData.length === 0 ? (
             <tr><td colSpan={9} className="p-8 text-center text-text-muted">No items found</td></tr>
           ) : filteredData.map(item => <tr key={item.id} className="hover:bg-tertiary transition-colors group">
@@ -153,19 +207,18 @@ export function InventoryTable() {
             </td>
             <td className="p-3 text-xs text-text-muted">{item.category}</td>
             <td className="p-3 text-right">
-              {/* Mocking quantity for now as it's not in base IProduct yet, assuming it handles it */}
-              <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded-sm ${getQuantityStyle(0)}`}>
-                0
+              <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded-sm ${getQuantityStyle(getQuantity(item))}`}>
+                {getQuantity(item)}
               </span>
             </td>
             <td className="p-3 text-right font-mono text-sm text-text-primary">
-              ${item.defaultSellingPrice?.toFixed(2)}
+              ${getPrice(item).toFixed(2)}
             </td>
-            <td className="p-3 text-right font-mono text-sm text-text-muted">
-              $0.00
+            <td className="p-3 text-right font-mono text-sm text-text-primary">
+              ${getValue(item).toFixed(2)}
             </td>
             <td className="p-3 text-center">
-              <div className="inline-block w-2 h-2 rounded-full bg-accent-green/50"></div>
+              <div className={`inline-block w-2 h-2 rounded-full ${getStatusColor(item)}`} title={getQuantity(item) === 0 ? 'Out of Stock' : getQuantity(item) < (item.minStockLevel || 10) ? 'Low Stock' : 'In Stock'}></div>
             </td>
             <td className="p-3 text-right">
               <button className="p-1 hover:bg-border-primary rounded text-text-muted hover:text-text-primary transition-colors">

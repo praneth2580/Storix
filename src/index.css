@@ -4,32 +4,32 @@
 
 :root {
   /* Light Mode */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --border-primary: #e2e8f0;
-  --border-secondary: #cbd5e1;
+  --bg-primary: 255 255 255;
+  --bg-secondary: 248 250 252;
+  --bg-tertiary: 241 245 249;
+  --text-primary: 15 23 42;
+  --text-secondary: 71 85 105;
+  --text-muted: 148 163 184;
+  --border-primary: 226 232 240;
+  --border-secondary: 203 213 225;
 
   /* Accents */
-  --accent-blue: #3b82f6;
-  --accent-green: #10b981;
-  --accent-red: #ef4444;
-  --accent-amber: #f59e0b;
+  --accent-blue: 59 130 246;
+  --accent-green: 16 185 129;
+  --accent-red: 239 68 68;
+  --accent-amber: 245 158 11;
 }
 
 :root.dark {
   /* Dark Mode */
-  --bg-primary: #0a0e14;
-  --bg-secondary: #1a1f2e;
-  --bg-tertiary: #0f1419;
-  --text-primary: #e0e6ed;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border-primary: #2d3748;
-  --border-secondary: #4a5568;
+  --bg-primary: 10 14 20;
+  --bg-secondary: 26 31 46;
+  --bg-tertiary: 15 20 25;
+  --text-primary: 224 230 237;
+  --text-secondary: 148 163 184;
+  --text-muted: 100 116 139;
+  --border-primary: 45 55 72;
+  --border-secondary: 74 85 104;
 }
 
 @layer base {
@@ -54,4 +54,15 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-text-muted;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

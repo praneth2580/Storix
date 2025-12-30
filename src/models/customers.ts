@@ -11,7 +11,7 @@ import { jsonpRequest } from '../utils.ts';
 export const getCustomers = async (
   params: Record<string, string> = {}
 ): Promise<ICustomer[]> => {
-  return jsonpRequest<ICustomer>('Customers', {
+  return jsonpRequest<ICustomer[]>('Customers', {
     action: "get",
     ...params,
   });
@@ -24,12 +24,12 @@ export const getCustomers = async (
 export const createCustomer = async (
   Customer: Omit<ICustomer, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<ICustomer> => {
-  const result = await jsonpRequest<ICustomer>('Customers', {
+  const result = await jsonpRequest<{ id: string, now: string }>('Customers', {
     action: "create",
     data: JSON.stringify(Customer),
   });
 
-  return result[0]; // unwrap array
+  return { ...Customer, id: result.id, createdAt: result.now, updatedAt: result.now } as ICustomer;
 };
 
 /**
@@ -38,13 +38,13 @@ export const createCustomer = async (
 export const updateCustomer = async (
   Customer: Partial<ICustomer> & { id: string }
 ): Promise<ICustomer> => {
-  const result = await jsonpRequest<ICustomer>('Customers', {
+  const result = await jsonpRequest<{ status: string, now: string }>('Customers', {
     action: "update",
     id: Customer.id,
     data: JSON.stringify(Customer),
   });
 
-  return result[0];
+  return { ...Customer, updatedAt: result.now } as ICustomer;
 };
 
 /**
@@ -56,5 +56,5 @@ export const deleteCustomer = async (id: string): Promise<{ success: boolean }> 
     id,
   });
 
-  return result[0];
+  return result;
 };

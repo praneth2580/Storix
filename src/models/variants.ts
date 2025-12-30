@@ -11,7 +11,7 @@ import { jsonpRequest } from '../utils.ts';
 export const getVariants = async (
   params: Record<string, string> = {}
 ): Promise<IVariant[]> => {
-  return jsonpRequest<IVariant>('Variants', {
+  return jsonpRequest<IVariant[]>('Variants', {
     action: "get",
     ...params,
   });
@@ -24,12 +24,27 @@ export const getVariants = async (
 export const createVariant = async (
   variant: Omit<IVariant, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<IVariant> => {
-  const result = await jsonpRequest<IVariant>('Variants', {
+  // Ensure attributes is a string
+  const payload = { ...variant };
+  if (payload.attributes && typeof payload.attributes !== 'string') {
+    payload.attributes = JSON.stringify(payload.attributes);
+  }
+
+  const result = await jsonpRequest<{ status: string, id: string, now: string, sheet: string }>('Variants', {
     action: "create",
-    data: JSON.stringify(variant),
+    data: JSON.stringify(payload),
   });
 
-  return result[0]; // unwrap array
+  // Construct the returned object (optimistic)
+  return {
+    ...variant,
+    id: result.id,
+    createdAt: result.now,
+    updatedAt: result.now,
+    stock: 0, // default
+    lowStock: 0, // default
+    attributes: typeof payload.attributes === 'string' ? JSON.parse(payload.attributes) : payload.attributes || {}
+  } as IVariant;
 };
 
 /**
@@ -38,12 +53,17 @@ export const createVariant = async (
 export const updateVariant = async (
   variant: Partial<IVariant> & { id: string }
 ): Promise<IVariant> => {
-  const result = await jsonpRequest<IVariant>('Variants', {
+  const payload = { ...variant };
+  if (payload.attributes && typeof payload.attributes !== 'string') {
+    payload.attributes = JSON.stringify(payload.attributes);
+  }
+
+  const result = await jsonpRequest<{ status: string, now: string }>('Variants', {
     action: "update",
-    data: JSON.stringify(variant),
+    data: JSON.stringify(payload),
   });
 
-  return result[0];
+  return { ...variant, updatedAt: result.now } as IVariant;
 };
 
 /**
@@ -55,5 +75,5 @@ export const deleteVariant = async (id: string): Promise<{ success: boolean }> =
     id,
   });
 
-  return result[0];
+  return result;
 };

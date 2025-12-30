@@ -105,7 +105,7 @@ export function Suppliers() {
                 View Catalog <ExternalLink size={10} />
               </button>
               <span className="text-[10px] text-text-muted font-mono">
-                ID: {supplier.id.padStart(4, '0')}
+                ID: {supplier.id?.padStart(4, '0')}
               </span>
             </div>
           </div>)}

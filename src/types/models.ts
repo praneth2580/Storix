@@ -1,6 +1,7 @@
 import { parseAttributes } from "../utils";
 
 // 📦 Product / Inventory Item
+// 📦 Product / Inventory Item
 export interface IProduct {
   id: string;
   name: string;
@@ -8,7 +9,6 @@ export interface IProduct {
   description?: string;
 
   barcode?: string;
-  hasVariants: boolean,
 
   // NEW — product inventory type
   type: "simple" | "measured" | "variant";
@@ -16,9 +16,13 @@ export interface IProduct {
   // For measured products only (kg, g, L, ml …)
   baseUnit?: string;
 
-  // Default prices (variant can override)
-  defaultCostPrice: number;
-  defaultSellingPrice: number;
+  // NEW Fields
+  sku?: string;
+  minStockLevel?: number;
+  supplierId?: string;
+  notes?: string;
+  status?: string; // "active" | "archived"
+  imageUrl?: string;
 
   createdAt: string;
   updatedAt: string;
@@ -32,11 +36,15 @@ export interface IVariant {
   sku?: string;
 
   // Flexible dynamic attributes — size, color, material, etc.
-  attributes: Record<string, string>;
+  attributes: Record<string, string> | string;
 
-  // Per-variant pricing (optional)
-  costPrice?: number;
-  sellingPrice?: number;
+  // RENAMED fields
+  cost: number;  // was costPrice
+  price: number; // was sellingPrice
+
+  // NEW fields
+  stock?: number;
+  lowStock?: number;
 
   product?: IProduct;
 
@@ -105,7 +113,7 @@ export interface IOrder {
   customerId?: string;
   totalAmount: number;
   paymentMethod?: "cash" | "card" | "upi" | "cheque" | "other" | "none" | "bank";
-  
+
   date: string;
   notes: string;
   createdAt: string;
@@ -170,7 +178,13 @@ export interface IReportSummary {
   lowStockItems: IProduct[];
 }
 
-// ⚙️ Settings
+// ⚙️ Settings - now dynamic key-value
+export interface ISettingItem {
+  key: string;
+  value: string;
+  updatedAt: string;
+}
+
 export interface ISettings {
   shopName: string;
   currency: string;
@@ -178,7 +192,8 @@ export interface ISettings {
   googleSheetId: string;
   theme?: "light" | "dark";
   offlineMode?: boolean;
-  updatedAt: string;
+  // Dynamic index signature for other settings
+  [key: string]: string | number | boolean | undefined;
 }
 
 // 📝 Base class utilities (Optional)
@@ -190,10 +205,13 @@ export class Product implements IProduct {
   barcode?: string;
   type: "simple" | "measured" | "variant";
   baseUnit?: string;
-  hasVariants: boolean;
 
-  defaultCostPrice: number;
-  defaultSellingPrice: number;
+  sku?: string;
+  minStockLevel?: number;
+  supplierId?: string;
+  notes?: string;
+  status?: string;
+  imageUrl?: string;
 
   createdAt: string;
   updatedAt: string;
@@ -204,17 +222,18 @@ export class Product implements IProduct {
     this.category = data.category;
     this.description = data.description;
     this.barcode = data.barcode;
-    this.hasVariants = data.hasVariants;
     this.type = data.type;
     this.baseUnit = data.baseUnit;
-    this.defaultCostPrice = data.defaultCostPrice;
-    this.defaultSellingPrice = data.defaultSellingPrice;
+
+    this.sku = data.sku;
+    this.minStockLevel = data.minStockLevel ? Number(data.minStockLevel) : undefined;
+    this.supplierId = data.supplierId;
+    this.notes = data.notes;
+    this.status = data.status || "active";
+    this.imageUrl = data.imageUrl;
+
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
-  }
-
-  get baseProfitMargin(): number {
-    return this.defaultSellingPrice - this.defaultCostPrice;
   }
 }
 
@@ -222,11 +241,11 @@ export class Variant implements IVariant {
   id: string;
   productId: string;
   sku?: string;
-  // Flexible dynamic attributes — size, color, material, etc.
-  attributes: Record<string, string>;
-  // Per-variant pricing (optional)
-  costPrice: number;
-  sellingPrice: number;
+  attributes: Record<string, string> | string;
+  cost: number;
+  price: number;
+  stock?: number;
+  lowStock?: number;
   product?: IProduct | undefined;
   createdAt: string;
   updatedAt: string;
@@ -235,16 +254,26 @@ export class Variant implements IVariant {
     this.id = data.id;
     this.productId = data.productId;
     this.sku = data.sku;
-    this.attributes = parseAttributes(String(data.attributes));
+
+    // Check if attributes is string and parse it, otherwise keep as object
+    if (typeof data.attributes === 'string') {
+      this.attributes = parseAttributes(data.attributes);
+    } else {
+      this.attributes = data.attributes || {};
+    }
+
     if (data.product) this.product = new Product(data.product);
-    this.costPrice = data.costPrice || 0;
-    this.sellingPrice = data.sellingPrice || 0;
+    this.cost = data.cost ? Number(data.cost) : 0;
+    this.price = data.price ? Number(data.price) : 0;
+    this.stock = data.stock ? Number(data.stock) : 0;
+    this.lowStock = data.lowStock ? Number(data.lowStock) : 0;
+
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }
 
   get baseProfitMargin(): number {
-    return this.sellingPrice - this.costPrice;
+    return this.price - this.cost;
   }
 }
 
@@ -328,7 +357,7 @@ export class Stock implements IStock {
 
 export class StockMovements implements IStockMovements {
   id: string;
-  
+
   variantId: string;
   product: Product;
   variant: Variant;
@@ -340,7 +369,7 @@ export class StockMovements implements IStockMovements {
   refId: string;
 
   createdAt: string;
-  
+
   constructor(data: IStockMovements) {
     this.id = data.id;
     this.variantId = data.variantId;

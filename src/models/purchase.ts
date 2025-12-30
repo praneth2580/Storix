@@ -10,7 +10,7 @@ import { jsonpRequest } from '../utils';
 export const getPurchases = async (
   params: Record<string, string> = {}
 ): Promise<IPurchase[]> => {
-  return jsonpRequest<IPurchase>('Purchases', {
+  return jsonpRequest<IPurchase[]>('Purchases', {
     action: "get",
     ...params,
   });
@@ -26,12 +26,12 @@ export const createPurchase = async (
   purchase: Omit<IPurchase, 'id' | 'date' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
 
-  const result = await jsonpRequest<{ id: string }>('Purchases', {
+  const result = await jsonpRequest<{ id: string, now: string }>('Purchases', {
     action: "create",
     data: JSON.stringify(purchase),
   });
 
-  return result[0]; // API always returns array
+  return { ...purchase, id: result.id };
 };
 
 
@@ -45,13 +45,13 @@ export const updatePurchase = async (
 
   const { id, ...rest } = purchase;
 
-  const result = await jsonpRequest<{ status: string }>('Purchases', {
+  const result = await jsonpRequest<{ status: string, id: string, now: string }>('Purchases', {
     action: "update",
     id,
     data: JSON.stringify(rest),
   });
 
-  return result[0];
+  return result;
 };
 
 
@@ -68,5 +68,5 @@ export const deletePurchase = async (
     id,
   });
 
-  return result[0];
+  return result;
 };

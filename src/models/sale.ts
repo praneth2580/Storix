@@ -33,7 +33,7 @@ export const getSales = async (
     }
   });
 
-  return jsonpRequest<ISale>("Sales", queryParams);
+  return jsonpRequest<ISale[]>("Sales", queryParams);
 };
 
 
@@ -47,12 +47,12 @@ export const createSale = async (
   sale: Omit<ISale, 'id' | 'date' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
 
-  const result = await jsonpRequest<{ id: string }>('Sales', {
+  const result = await jsonpRequest<{ id: string, now: string }>('Sales', {
     action: "create",
     data: JSON.stringify(sale),
   });
 
-  return result[0];
+  return { ...sale, id: result.id };
 };
 
 
@@ -72,7 +72,7 @@ export const updateSale = async (
     data: JSON.stringify(rest),
   });
 
-  return result[0];
+  return result;
 };
 
 
@@ -89,5 +89,5 @@ export const deleteSale = async (
     id,
   });
 
-  return result[0];
+  return result;
 };

@@ -11,10 +11,16 @@ import { jsonpRequest } from '../utils';
 export const getSuppliers = async (
   params: Record<string, string> = {}
 ): Promise<ISupplier[]> => {
-  return jsonpRequest<ISupplier>('Suppliers', {
+  const data = await jsonpRequest<ISupplier[]>('Suppliers', {
     action: "get",
     ...params,
   });
+
+  return data.map(s => ({
+    ...s,
+    id: String(s.id),
+    phone: s.phone ? String(s.phone) : undefined
+  }));
 };
 
 /**
@@ -26,13 +32,12 @@ export const createSupplier = async (
   supplier: Omit<ISupplier, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
 
-  const result = await jsonpRequest<{ id: string }>('Suppliers', {
+  const result = await jsonpRequest<{ id: string, now: string }>('Suppliers', {
     action: "create",
     data: JSON.stringify(supplier),
   });
 
-  // result is an array → return first item
-  return result[0];
+  return { ...supplier, id: result.id, createdAt: result.now, updatedAt: result.now } as ISupplier;
 };
 
 /**
@@ -44,13 +49,13 @@ export const updateSupplier = async (
 ): Promise<{ status: string }> => {
   const { id, ...rest } = supplier;
 
-  const result = await jsonpRequest<{ status: string }>('Suppliers', {
+  const result = await jsonpRequest<{ status: string, now: string }>('Suppliers', {
     action: "update",
     id,
     data: JSON.stringify(rest),
   });
 
-  return result[0]
+  return result;
 };
 
 /**
@@ -66,5 +71,5 @@ export const deleteSupplier = async (
     id,
   });
 
-  return result[0]
+  return result;
 };

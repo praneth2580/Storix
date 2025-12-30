@@ -26,10 +26,21 @@ export function Login({
       <div className="h-1 w-full bg-accent-blue"></div>
 
       <div className="p-8">
+        {/* Banner Image */}
+        <div className="mb-8 flex justify-center">
+          <img 
+            src="/banner.png" 
+            alt="Storix Banner" 
+            className="h-20 w-auto object-contain"
+          />
+        </div>
+        
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-accent-blue rounded flex items-center justify-center text-white">
-            <Terminal size={20} />
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="Storix Logo" 
+            className="w-10 h-10 object-contain"
+          />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">STORIX</h1>
             <p className="text-xs text-text-muted font-mono uppercase tracking-wider">
@@ -68,7 +79,7 @@ export function Login({
 
             <button
               onClick={handleLogin}
-              className="w-full bg-text-primary hover:bg-text-secondary text-bg-primary font-bold py-3 px-4 flex items-center justify-center gap-3 transition-colors group rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-text-primary text-tertiary hover:bg-text-secondary text-bg-primary font-bold py-3 px-4 flex items-center justify-center gap-3 transition-colors group rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!scriptId}
             >
               <Terminal size={18} />

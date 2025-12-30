@@ -10,7 +10,7 @@ import { jsonpRequest } from '../utils.ts';
 export const getProducts = async (
   params: Record<string, string> = {}
 ): Promise<IProduct[]> => {
-  return jsonpRequest<IProduct>('Products', {
+  return jsonpRequest<IProduct[]>('Products', {
     action: "get",
     ...params,
   });
@@ -26,13 +26,12 @@ export const createProduct = async (
   product: Omit<IProduct, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
 
-  const result = await jsonpRequest<{ id: string }>('Products', {
+  const result = await jsonpRequest<{ status: string, id: string, now: string }>('Products', {
     action: "create",
     data: JSON.stringify(product),
   });
 
-  // result is an array → return first item
-  return result[0];
+  return { ...product, id: result.id, createdAt: result.now, updatedAt: result.now } as IProduct;
 };
 
 
@@ -45,13 +44,13 @@ export const updateProduct = async (
 ): Promise<{ status: string }> => {
   const { id, ...rest } = product;
 
-  const result = await jsonpRequest<{ status: string }>('Products', {
+  const result = await jsonpRequest<{ status: string, id: string, now: string }>('Products', {
     action: "update",
     id,
     data: JSON.stringify(rest),
   });
 
-  return result[0]
+  return result; // status object
 };
 
 /**
@@ -67,5 +66,5 @@ export const deleteProduct = async (
     id,
   });
 
-  return result[0]
+  return result;
 };

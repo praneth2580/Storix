@@ -3,7 +3,11 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // Base path for GitHub Pages deployment
+  // Change this to your repository name if different from 'Storix'
+  // For user/organization pages (username.github.io), set base: '/'
+  base: command === 'build' ? '/Storix/' : '/',
   plugins: [
     react(),
     VitePWA({
@@ -29,4 +33,4 @@ export default defineConfig({
       }
     })
   ],
-})
+}))

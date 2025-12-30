@@ -1,4 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { RootState } from './store'
+import {
+  setAuthenticated,
+  setActiveTab,
+  setTheme,
+  toggleTheme,
+  setSidebarOpen,
+  toggleSidebar,
+} from './store/slices/uiSlice'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
 import { InventoryTable } from './pages/InventoryTable'
@@ -7,24 +17,32 @@ import { Products } from './pages/Products'
 import { SalesEntry } from './pages/SalesEntry'
 import { PurchaseEntry } from './pages/PurchaseEntry'
 import { Suppliers } from './pages/Suppliers'
+import { Customers } from './pages/Customers'
 import { Settings } from './pages/Settings'
 import { POS } from './pages/POS'
 import { Reports } from './pages/Reports'
 import { Menu } from 'lucide-react'
+
 export function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const dispatch = useDispatch()
+  const { isAuthenticated, activeTab, theme, isSidebarOpen } = useSelector(
+    (state: RootState) => state.ui
+  )
+
   // Initialize theme
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
+    const script_id = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') as string | null;
+
     if (savedTheme) {
-      setTheme(savedTheme)
+      dispatch(setTheme(savedTheme))
     } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark')
+      dispatch(setTheme('dark'))
     }
-  }, [])
+
+    if (script_id) dispatch(setAuthenticated(true))
+  }, [dispatch])
+
   // Apply theme class
   useEffect(() => {
     const root = window.document.documentElement
@@ -32,23 +50,31 @@ export function App() {
     root.classList.add(theme)
     localStorage.setItem('theme', theme)
   }, [theme])
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+
+  const handleToggleTheme = () => {
+    dispatch(toggleTheme())
   }
+
   if (!isAuthenticated) {
-    return <Login onLogin={() => setIsAuthenticated(true)} />
+    return <Login onLogin={() => dispatch(setAuthenticated(true))} />
   }
+
   return (
     <div className="flex h-screen w-full bg-primary text-text-primary overflow-hidden font-sans selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-200">
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-secondary border-b border-border-primary flex items-center px-4 z-50 justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            onClick={() => dispatch(toggleSidebar())}
             className="text-text-secondary"
           >
             <Menu size={24} />
           </button>
+          <img 
+            src="/logo.png" 
+            alt="Storix Logo" 
+            className="h-6 w-auto object-contain"
+          />
           <span className="font-bold text-lg">Storix</span>
         </div>
       </div>
@@ -63,10 +89,10 @@ export function App() {
         <Sidebar
           activeTab={activeTab}
           onTabChange={(tab) => {
-            setActiveTab(tab)
-            setIsSidebarOpen(false)
+            dispatch(setActiveTab(tab))
+            dispatch(setSidebarOpen(false))
           }}
-          onLogout={() => setIsAuthenticated(false)}
+          onLogout={() => dispatch(setAuthenticated(false))}
         />
       </div>
 
@@ -74,7 +100,7 @@ export function App() {
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
+          onClick={() => dispatch(setSidebarOpen(false))}
         />
       )}
 
@@ -90,9 +116,10 @@ export function App() {
         {activeTab === 'sales' && <SalesEntry />}
         {activeTab === 'purchases' && <PurchaseEntry />}
         {activeTab === 'suppliers' && <Suppliers />}
+        {activeTab === 'customers' && <Customers />}
         {activeTab === 'reports' && <Reports />}
         {activeTab === 'settings' && (
-          <Settings theme={theme} onToggleTheme={toggleTheme} />
+          <Settings theme={theme} onToggleTheme={handleToggleTheme} />
         )}
 
         {/* Fallback for undefined routes */}
@@ -104,6 +131,7 @@ export function App() {
           'sales',
           'purchases',
           'suppliers',
+          'customers',
           'reports',
           'settings',
         ].includes(activeTab) && (

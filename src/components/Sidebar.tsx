@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Search,
+  User,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -48,6 +49,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
       items: [
         { id: 'products', icon: Package, label: 'Products' },
         { id: 'stock', icon: BoxIcon, label: 'Stock Manager' },
+        { id: 'customers', icon: User, label: 'Customers' },
         { id: 'suppliers', icon: Users, label: 'Suppliers' },
       ]
     },
@@ -77,11 +79,13 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
     >
       {/* Brand Section */}
       <div className={`h-16 flex items-center px-4 border-b border-border-primary/50 border-gray-500 relative ${isExpanded ? 'justify-between' : 'justify-center lg:justify-center justify-between'}`}>
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-8 h-8 bg-gradient-to-tr from-accent-blue to-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/20 shrink-0">
-            S
-          </div>
-          <span className={`font-bold text-lg tracking-tight text-text-primary transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'lg:opacity-0 opacity-100'}`}>
+        <div className={`flex items-center transition-all duration-300 overflow-hidden ${isExpanded ? 'gap-3' : 'gap-3 lg:gap-0'}`}>
+          <img 
+            src="/logo.png" 
+            alt="Storix Logo" 
+            className="w-8 h-8 object-contain shrink-0"
+          />
+          <span className={`font-bold text-lg tracking-tight text-text-primary transition-all duration-300 overflow-hidden whitespace-nowrap ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>
             Storix
           </span>
         </div>
@@ -119,7 +123,8 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
                     onMouseLeave={() => setHoveredItem(null)}
                     className={`
                       w-full relative group
-                      flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
+                      flex items-center px-3 py-2.5 rounded-lg transition-all duration-200
+                      ${isExpanded ? 'gap-3' : 'gap-3 lg:gap-0 lg:justify-center'}
                       ${isActive
                         ? 'bg-accent-blue/10 text-accent-blue shadow-sm'
                         : 'text-text-muted hover:text-text-primary hover:bg-tertiary/80'}
@@ -137,25 +142,11 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
                     />
 
                     <span className={`
-                      text-sm font-medium transition-all duration-300 origin-left
+                      text-sm font-medium transition-all duration-300 origin-left overflow-hidden whitespace-nowrap
                       ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}
                     `}>
                       {item.label}
                     </span>
-
-                    {/* Active Indicator Dot (Desktop Collapsed) */}
-                    {!isExpanded && isActive && (
-                      <div className="hidden lg:block absolute right-2 w-1.5 h-1.5 rounded-full bg-accent-blue shadow-lg shadow-blue-500/50" />
-                    )}
-
-                    {/* Tooltip for desktop collapsed */}
-                    {!isExpanded && (
-                      <div className="hidden lg:block absolute left-full ml-4 px-2 py-1 bg-popover text-text-primary text-xs rounded shadow-xl border border-border-primary opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                        {item.label}
-                        {/* Arrow */}
-                        <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-popover border-l border-b border-border-primary rotate-45 transform"></div>
-                      </div>
-                    )}
                   </button>
                 );
               })}
@@ -168,10 +159,10 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
       <div className="p-3 border-t border-border-primary bg-tertiary/30">
         <button className={`
             w-full flex items-center px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-tertiary transition-colors group
-            ${isExpanded ? 'justify-start gap-3' : 'justify-center lg:justify-center justify-start gap-3'}
+            ${isExpanded ? 'justify-start gap-3' : 'justify-center lg:justify-center lg:gap-0 justify-start gap-3'}
          `}>
           <Bell size={20} className="shrink-0" />
-          <span className={`text-sm font-medium transition-all duration-300 ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>
+          <span className={`text-sm font-medium transition-all duration-300 overflow-hidden whitespace-nowrap ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>
             Notifications
           </span>
           <span className="w-2 h-2 bg-accent-red rounded-full absolute top-3 right-3 lg:static lg:ml-auto"></span>
@@ -181,11 +172,11 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
           onClick={onLogout}
           className={`
              w-full flex items-center px-3 py-2 mt-1 rounded-lg text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-colors group
-             ${isExpanded ? 'justify-start gap-3' : 'justify-center lg:justify-center justify-start gap-3'}
+             ${isExpanded ? 'justify-start gap-3' : 'justify-center lg:justify-center lg:gap-0 justify-start gap-3'}
            `}
         >
           <LogOut size={20} className="shrink-0" />
-          <span className={`text-sm font-medium transition-all duration-300 whitespace-nowrap ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>
+          <span className={`text-sm font-medium transition-all duration-300 whitespace-nowrap overflow-hidden ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>
             Log Out
           </span>
         </button>

@@ -51,64 +51,102 @@ export const SCRIPT_URL = `https://script.google.com/macros/s/${SCRIPT_ID}/exec`
 //     document.body.appendChild(script);
 //   });
 // }
+// Queue for serializing JSONP requests
+interface RequestItem {
+  sheet: string;
+  params: Record<string, string>;
+  resolve: (value: any) => void;
+  reject: (reason?: any) => void;
+}
+
+const requestQueue: RequestItem[] = [];
+let isProcessingQueue = false;
+
+const processQueue = () => {
+  if (requestQueue.length === 0) {
+    isProcessingQueue = false;
+    return;
+  }
+
+  isProcessingQueue = true;
+  const { sheet, params, resolve, reject } = requestQueue[0];
+  const callbackName = "storix"; // Fixed callback name from backend
+
+  // Define the global callback
+  (window as any)[callbackName] = (response: any) => {
+    try {
+      let data = response;
+      // Handle wrapped format: { data: [...] } if applicable, though typically backend returns direct obj or array
+      // The new backend seems to return obj directly or { results: ... } for batch
+
+      resolve(data);
+    } catch (err) {
+      reject(err);
+    } finally {
+      cleanup();
+      // Process next item
+      requestQueue.shift();
+      processQueue();
+    }
+  };
+
+  const cleanup = () => {
+    // We don't delete window.storix because it's fixed, but we could nullify it if we wanted safety
+    // (window as any)[callbackName] = undefined; 
+    if (script && script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+  };
+
+  const query = new URLSearchParams({
+    sheet,
+    ...params, // No 'callback' param needed as it's fixed in backend, but backend might ignore it
+  }).toString();
+
+  const script = document.createElement("script");
+  const scriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
+
+  if (!scriptId) {
+    reject(new Error("VITE_GOOGLE_SCRIPT_ID is missing in localStorage"));
+    // cleanup and move next
+    requestQueue.shift();
+    processQueue();
+    return;
+  }
+
+  const scriptUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+
+  // Just in case backend still looks for 'callback' param, though it shouldn't matter if it hardcodes 'storix' properties 
+  // checking script.js: const wrapped = JSONP_CALLBACK + "(" + payload + ");"; 
+  // It hardcodes it.
+
+  script.src = `${scriptUrl}?${query}`;
+  script.async = true;
+  script.onerror = () => {
+    cleanup();
+    reject(new Error(`JSONP request failed for ${sheet}`));
+    requestQueue.shift();
+    processQueue();
+  };
+
+  document.body.appendChild(script);
+};
+
 export function jsonpRequest<T>(
   sheet: string,
   params: Record<string, string> = {}
-): Promise<T[]> {
+): Promise<T> {
   return new Promise((resolve, reject) => {
     if (typeof document === "undefined") {
       reject("Not running in a browser environment");
       return;
     }
 
-    const callbackName = `jsonp_cb_${Date.now()}_${Math.floor(
-      Math.random() * 1000
-    )}`;
+    requestQueue.push({ sheet, params, resolve, reject });
 
-    (window as any)[callbackName] = (response: any) => {
-      try {
-        let data = response;
-
-        // Handle wrapped format: { data: [...] }
-        if (response && response.data) {
-          data = response.data;
-        }
-
-        // Normalize to array (THIS FIXES YOUR ISSUE)
-        const arr = Array.isArray(data) ? data : [data];
-
-        resolve(arr);
-      } catch (err) {
-        reject(err);
-      } finally {
-        delete (window as any)[callbackName];
-        if (script.parentNode) script.parentNode.removeChild(script);
-      }
-    };
-
-    const query = new URLSearchParams({
-      sheet,
-      callback: callbackName,
-      ...params,
-    }).toString();
-
-    const script = document.createElement("script");
-    const scriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
-
-    if (!scriptId) {
-      reject(new Error("VITE_GOOGLE_SCRIPT_ID is missing in localStorage"));
-      return;
+    if (!isProcessingQueue) {
+      processQueue();
     }
-
-    const scriptUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
-    script.src = `${scriptUrl}?${query}`;
-    script.async = true;
-    script.onerror = () => {
-      delete (window as any)[callbackName];
-      reject(new Error(`JSONP request failed for ${sheet}`));
-    };
-
-    document.body.appendChild(script);
   });
 }
 

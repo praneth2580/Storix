@@ -16,7 +16,7 @@ export const getStocks = async (
     finalParams[key] = Array.isArray(value) ? value.join(",") : value;
   });
 
-  return jsonpRequest<IStock>('Stock', {
+  return jsonpRequest<IStock[]>('Stock', {
     action: "get",
     ...finalParams,
   });
@@ -31,13 +31,12 @@ export const createStock = async (
   stock: Omit<IStock, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<{ id: string }> => {
 
-  const result = await jsonpRequest<{ id: string }>('Stock', {
+  const result = await jsonpRequest<{ id: string, now: string }>('Stock', {
     action: "create",
     data: JSON.stringify(stock),
   });
 
-  // result is an array → return first item
-  return result[0];
+  return { ...stock, id: result.id, updatedAt: result.now } as IStock;
 };
 
 
@@ -50,13 +49,13 @@ export const updateStock = async (
 ): Promise<{ status: string }> => {
   const { id, ...rest } = stock;
 
-  const result = await jsonpRequest<{ status: string }>('Stock', {
+  const result = await jsonpRequest<{ status: string, now: string }>('Stock', {
     action: "update",
     id,
     data: JSON.stringify(rest),
   });
 
-  return result[0]
+  return result;
 };
 
 /**
@@ -72,5 +71,5 @@ export const deleteStock = async (
     id,
   });
 
-  return result[0]
+  return result;
 };

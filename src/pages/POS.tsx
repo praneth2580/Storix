@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ScanBarcode, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, X, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Search, ScanBarcode, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, X, CheckCircle2, RotateCcw, Download } from 'lucide-react';
 import { useAppSelector, useDataPolling } from '../store/hooks';
 import { fetchProducts } from '../store/slices/inventorySlice';
 import { IProduct } from '../types/models';
@@ -70,6 +70,306 @@ export function POS() {
     setShowReceipt(false);
     clearCart();
   };
+  const handleDownloadInvoice = () => {
+    if (cart.length === 0) {
+      alert("Cart is empty. Add items before generating invoice.");
+      return;
+    }
+
+    const invoiceWindow = window.open('', '_blank');
+    if (!invoiceWindow) return alert("Please allow popups to download invoice");
+
+    const invoiceId = `POS-${Date.now().toString().slice(-8)}`;
+    const invoiceDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    
+    const itemsRows = cart.map(item => `
+      <tr>
+        <td>${item.name}</td>
+        <td class="text-center">${item.quantity}</td>
+        <td class="text-right">$${item.defaultSellingPrice.toFixed(2)}</td>
+        <td class="text-right">$${(item.defaultSellingPrice * item.quantity).toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <html>
+      <head>
+        <title>Invoice ${invoiceId}</title>
+        <style>
+          @media print {
+            body { margin: 0; padding: 0; }
+            .invoice-box { box-shadow: none; }
+          }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+            padding: 40px 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+          }
+          .invoice-box { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 0; 
+            background: white; 
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+          }
+          .header-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px 50px 40px;
+            position: relative;
+          }
+          .header-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+          }
+          .invoice-logo {
+            margin-bottom: 20px;
+            text-align: center;
+          }
+          .invoice-logo img {
+            height: 60px;
+            width: auto;
+            object-fit: contain;
+          }
+          .invoice-banner {
+            margin-bottom: 20px;
+            text-align: center;
+          }
+          .invoice-banner img {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            object-fit: contain;
+          }
+          .invoice-number {
+            font-size: 18px;
+            opacity: 0.95;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-align: center;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 40px 50px;
+            background: #f8f9fa;
+          }
+          .info-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #6c757d;
+            margin-bottom: 15px;
+            font-weight: 600;
+          }
+          .info-section p {
+            font-size: 15px;
+            color: #212529;
+            margin: 8px 0;
+            line-height: 1.6;
+          }
+          .info-section strong {
+            color: #495057;
+            font-weight: 600;
+            display: inline-block;
+            min-width: 80px;
+          }
+          .items-section {
+            padding: 50px;
+          }
+          .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #667eea;
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 0;
+            background: white;
+          }
+          thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          th { 
+            color: white; 
+            padding: 18px 15px; 
+            text-align: left; 
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          th.text-center { text-align: center; }
+          th.text-right { text-align: right; }
+          tbody tr {
+            border-bottom: 1px solid #e9ecef;
+            transition: background 0.2s;
+          }
+          tbody tr:hover {
+            background: #f8f9fa;
+          }
+          tbody tr:nth-child(even) {
+            background: #fafbfc;
+          }
+          tbody tr:nth-child(even):hover {
+            background: #f1f3f5;
+          }
+          td { 
+            padding: 18px 15px; 
+            color: #495057;
+            font-size: 14px;
+          }
+          td.text-center { text-align: center; }
+          td.text-right { text-align: right; }
+          .total-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+          }
+          .total-row {
+            display: flex;
+            justify-content: flex-end;
+            padding: 12px 15px;
+            font-size: 15px;
+          }
+          .total-row-label {
+            width: 200px;
+            text-align: right;
+            padding-right: 20px;
+            color: #6c757d;
+            font-weight: 500;
+          }
+          .total-row-value {
+            width: 150px;
+            text-align: right;
+            color: #212529;
+            font-weight: 600;
+          }
+          .total-row.final {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            padding: 20px 15px;
+          }
+          .total-row.final .total-row-label,
+          .total-row.final .total-row-value {
+            color: white;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 40px 50px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+          }
+          .footer p {
+            color: #6c757d;
+            font-size: 14px;
+            margin: 5px 0;
+          }
+          .footer .thank-you {
+            font-size: 18px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-box">
+          <div class="header-section">
+            <div class="invoice-logo">
+              <img src="/pos-logo.png" alt="Storix POS Logo" />
+            </div>
+            <div class="invoice-banner">
+              <img src="/pos-banner.png" alt="Storix POS Banner" />
+            </div>
+            <div class="invoice-number">Invoice #${invoiceId}</div>
+          </div>
+          
+          <div class="info-grid">
+            <div class="info-section">
+              <h3>Store Information</h3>
+              <p><strong>STORIX POS</strong></p>
+              <p>Store #404 - Terminal 1</p>
+              <p>123 Business Street</p>
+              <p>City, State 12345</p>
+              <p>Email: info@storix.com</p>
+              <p>Phone: (555) 123-4567</p>
+            </div>
+            <div class="info-section">
+              <h3>Transaction Details</h3>
+              <p><strong>Date:</strong> ${invoiceDate}</p>
+              <p><strong>Payment Method:</strong> ${paymentMethod.toUpperCase()}</p>
+              <p><strong>Authorization:</strong> ${Math.floor(Math.random() * 999999)}</p>
+            </div>
+          </div>
+          
+          <div class="items-section">
+            <div class="section-title">Items</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th class="text-center">Quantity</th>
+                  <th class="text-right">Unit Price</th>
+                  <th class="text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRows}
+              </tbody>
+            </table>
+            
+            <div class="total-section">
+              <div class="total-row">
+                <div class="total-row-label">Subtotal:</div>
+                <div class="total-row-value">$${subtotal.toFixed(2)}</div>
+              </div>
+              <div class="total-row">
+                <div class="total-row-label">Tax (8%):</div>
+                <div class="total-row-value">$${tax.toFixed(2)}</div>
+              </div>
+              <div class="total-row final">
+                <div class="total-row-label">TOTAL:</div>
+                <div class="total-row-value">$${total.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p class="thank-you">Thank you for your business!</p>
+            <p>We appreciate your trust in our services</p>
+          </div>
+        </div>
+        <script>
+          window.onload = function() { 
+            setTimeout(() => window.print(), 250);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    invoiceWindow.document.write(html);
+    invoiceWindow.document.close();
+  };
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,7 +382,20 @@ export function POS() {
     return <div className="h-full flex items-center justify-center bg-primary p-4">
       <div className="bg-white text-black p-8 max-w-md w-full shadow-2xl font-mono relative rounded-sm">
         <div className="text-center mb-6 border-b-2 border-dashed border-black pb-6">
-          <h2 className="text-2xl font-bold mb-2">STORIX POS</h2>
+          <div className="flex justify-center mb-3">
+            <img 
+              src="/pos-logo.png" 
+              alt="Storix POS Logo" 
+              className="h-12 w-auto object-contain"
+            />
+          </div>
+          <div className="mb-3">
+            <img 
+              src="/pos-banner.png" 
+              alt="Storix POS Banner" 
+              className="h-16 w-full object-contain mx-auto"
+            />
+          </div>
           <p className="text-sm">Store #404 - Terminal 1</p>
           <p className="text-sm">{new Date().toLocaleString()}</p>
         </div>
@@ -120,6 +433,12 @@ export function POS() {
             <ScanBarcode size={48} className="opacity-50" />
           </div>
           <p className="text-xs">Thank you for your business!</p>
+          <button 
+            onClick={handleDownloadInvoice}
+            className="w-full bg-accent-blue hover:bg-blue-600 text-white py-3 font-bold transition-colors flex items-center justify-center gap-2 rounded-sm"
+          >
+            <Download size={16} /> Download Invoice
+          </button>
           <button onClick={handleNewSale} className="w-full bg-black text-white py-3 font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 rounded-sm">
             <RotateCcw size={16} /> Start New Sale
           </button>
@@ -252,6 +571,13 @@ export function POS() {
           </button>
         </div>
 
+        <button 
+          onClick={handleDownloadInvoice} 
+          disabled={cart.length === 0}
+          className="w-full mb-3 bg-secondary hover:bg-tertiary border border-border-primary text-text-primary py-2.5 font-medium rounded-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Download size={16} /> Download Invoice
+        </button>
         <button onClick={handleCheckout} disabled={cart.length === 0 || isCheckingOut} className={`w-full py-4 font-bold text-lg flex items-center justify-center gap-2 transition-all rounded-sm ${isCheckingOut ? 'bg-accent-green text-white cursor-wait' : cart.length === 0 ? 'bg-border-primary text-text-muted cursor-not-allowed' : 'bg-accent-blue hover:bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]'}`}>
           {isCheckingOut ? <>
             <CheckCircle2 className="animate-pulse" /> Processing...
