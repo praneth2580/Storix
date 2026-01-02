@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Search, ScanBarcode, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, X, CheckCircle2, RotateCcw, Download } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useAppSelector, useDataPolling } from '../store/hooks';
 import { fetchProducts } from '../store/slices/inventorySlice';
 import { IProduct } from '../types/models';
@@ -18,6 +19,10 @@ export function POS() {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'qr'>('card');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [showUPIQr, setShowUPIQr] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scanContainerRef = useRef<HTMLDivElement>(null);
 
   // Filter products
   const filteredProducts = products.filter(p => {
@@ -27,7 +32,7 @@ export function POS() {
   });
 
   // Cart Logic
-  const addToCart = (product: IProduct) => {
+  const addToCart = useCallback((product: IProduct) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -41,7 +46,67 @@ export function POS() {
         quantity: 1
       }];
     });
-  };
+  }, []);
+
+  // Barcode Scanner Logic
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        await scannerRef.current.clear();
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+      }
+      scannerRef.current = null;
+    }
+    setIsScanning(false);
+  }, []);
+
+  const handleBarcodeScanned = useCallback((barcode: string) => {
+    // Find product by barcode
+    const product = products.find(p => p.barcode === barcode);
+    
+    if (product) {
+      addToCart(product);
+      // Stop scanner after successful scan
+      stopScanner();
+      // Show brief success feedback
+      setSearch(barcode);
+      setTimeout(() => setSearch(''), 2000);
+    } else {
+      // Product not found - show alert but keep scanning
+      alert(`Product with barcode "${barcode}" not found.`);
+    }
+  }, [products, addToCart, stopScanner]);
+
+  const startScanner = useCallback(async () => {
+    if (!scanContainerRef.current) return;
+    
+    try {
+      const html5QrCode = new Html5Qrcode("barcode-scanner");
+      scannerRef.current = html5QrCode;
+
+      await html5QrCode.start(
+        { facingMode: "environment" }, // Use back camera
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          // Success callback - barcode/QR detected
+          handleBarcodeScanned(decodedText);
+        },
+        (errorMessage) => {
+          // Error callback - ignore, scanner will keep trying
+        }
+      );
+      setIsScanning(true);
+    } catch (err) {
+      console.error('Error starting scanner:', err);
+      alert('Failed to start camera. Please ensure camera permissions are granted.');
+    }
+  }, [handleBarcodeScanned]);
   const updateQuantity = (id: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
@@ -59,6 +124,27 @@ export function POS() {
   const subtotal = cart.reduce((sum, item) => sum + item.defaultSellingPrice * item.quantity, 0);
   const tax = subtotal * 0.08;
   const total = subtotal + tax;
+
+  // UPI QR Code Generation
+  const generateUPIQRCode = () => {
+    // UPI payment URL format: upi://pay?pa=<merchant_vpa>&pn=<merchant_name>&am=<amount>&cu=INR&tn=<transaction_note>
+    const merchantVPA = 'storix@paytm'; // Replace with actual merchant UPI ID
+    const merchantName = 'Storix POS';
+    const amount = total.toFixed(2);
+    const transactionNote = `Payment for Order #${Date.now().toString().slice(-8)}`;
+    
+    const upiUrl = `upi://pay?pa=${merchantVPA}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    
+    // Generate QR code using QR Server API
+    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiUrl)}`;
+  };
+
+  const handleQRPaymentClick = () => {
+    setPaymentMethod('qr');
+    if (cart.length > 0) {
+      setShowUPIQr(true);
+    }
+  };
   const handleCheckout = () => {
     setIsCheckingOut(true);
     setTimeout(() => {
@@ -373,11 +459,26 @@ export function POS() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') clearCart();
+      if (e.key === 'Escape') {
+        if (isScanning) {
+          stopScanner();
+        } else {
+          clearCart();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isScanning, stopScanner]);
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        stopScanner();
+      }
+    };
+  }, [stopScanner]);
   if (showReceipt) {
     return <div className="h-full flex items-center justify-center bg-primary p-4">
       <div className="bg-white text-black p-8 max-w-md w-full shadow-2xl font-mono relative rounded-sm">
@@ -447,6 +548,97 @@ export function POS() {
     </div>;
   }
   return <div className="flex flex-col lg:flex-row h-full bg-primary text-text-primary overflow-hidden">
+    {/* UPI QR Code Modal */}
+    {showUPIQr && (
+      <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div className="bg-secondary border border-border-primary rounded-lg p-6 max-w-md w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-text-primary">Scan to Pay via UPI</h3>
+            <button
+              onClick={() => setShowUPIQr(false)}
+              className="text-text-muted hover:text-accent-red transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg flex flex-col items-center mb-4">
+            <div className="mb-4">
+              <img 
+                src={generateUPIQRCode()} 
+                alt="UPI Payment QR Code" 
+                className="w-64 h-64 border-2 border-border-primary rounded-lg"
+              />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-sm font-semibold text-gray-800">Amount to Pay</p>
+              <p className="text-2xl font-bold text-accent-blue">₹{total.toFixed(2)}</p>
+              <p className="text-xs text-gray-600 mt-2">Scan with any UPI app</p>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-sm text-text-muted mb-4">
+            <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span className="font-mono">₹{subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tax (8%):</span>
+              <span className="font-mono">₹{tax.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-border-primary font-semibold text-text-primary">
+              <span>Total:</span>
+              <span className="font-mono">₹{total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowUPIQr(false)}
+              className="flex-1 bg-secondary hover:bg-tertiary border border-border-primary text-text-primary py-2.5 font-medium rounded-sm transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowUPIQr(false);
+                handleCheckout();
+              }}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2.5 font-medium rounded-sm transition-colors flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={16} /> Payment Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Barcode Scanner Modal */}
+    {isScanning && (
+      <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div className="bg-secondary border border-border-primary rounded-lg p-6 max-w-md w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-text-primary">Scan Barcode/QR Code</h3>
+            <button
+              onClick={stopScanner}
+              className="text-text-muted hover:text-accent-red transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          <div 
+            id="barcode-scanner" 
+            ref={scanContainerRef}
+            className="w-full rounded-lg overflow-hidden bg-black"
+            style={{ minHeight: '300px' }}
+          />
+          <p className="text-sm text-text-muted mt-4 text-center">
+            Point camera at barcode or QR code. Press ESC to cancel.
+          </p>
+        </div>
+      </div>
+    )}
+    
     {/* Left Side: Product Catalog */}
     <div className="flex-1 flex flex-col border-r border-border-primary overflow-hidden">
       {/* Search & Filter Bar */}
@@ -454,7 +646,11 @@ export function POS() {
         <div className="relative flex-1">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input type="text" placeholder="Scan barcode or search product..." value={search} onChange={e => setSearch(e.target.value)} autoFocus className="w-full bg-primary border border-border-primary text-text-primary py-3 pl-10 pr-12 focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue placeholder-text-muted rounded-sm" />
-          <button className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-blue">
+          <button 
+            onClick={() => isScanning ? stopScanner() : startScanner()}
+            className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${isScanning ? 'text-accent-red hover:text-red-600' : 'text-text-muted hover:text-accent-blue'}`}
+            title={isScanning ? 'Stop Scanner' : 'Start Barcode Scanner'}
+          >
             <ScanBarcode size={20} />
           </button>
         </div>
@@ -566,7 +762,7 @@ export function POS() {
           <button onClick={() => setPaymentMethod('cash')} className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors ${paymentMethod === 'cash' ? 'bg-accent-green/20 border-accent-green text-accent-green' : 'bg-secondary border-border-primary text-text-muted'}`}>
             <Banknote size={16} /> Cash
           </button>
-          <button onClick={() => setPaymentMethod('qr')} className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors ${paymentMethod === 'qr' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-secondary border-border-primary text-text-muted'}`}>
+          <button onClick={handleQRPaymentClick} className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors ${paymentMethod === 'qr' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-secondary border-border-primary text-text-muted'}`}>
             <QrCode size={16} /> QR
           </button>
         </div>
