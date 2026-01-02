@@ -904,6 +904,13 @@ function ProductDetailView({
     loadLabelLayouts();
   }, []);
 
+  // Reload layouts when modal opens
+  useEffect(() => {
+    if (product) {
+      loadLabelLayouts();
+    }
+  }, [product]);
+
   const loadLabelLayouts = async () => {
     try {
       const layouts = await getLabelLayouts();

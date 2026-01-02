@@ -20,14 +20,33 @@ export const getLabelLayouts = async (): Promise<LabelLayouts> => {
       key: SETTINGS_KEY
     });
     
+    console.log('Fetched settings for labelLayouts:', settings);
+    
     if (settings && Array.isArray(settings) && settings.length > 0 && settings[0].value) {
-      const layouts = JSON.parse(settings[0].value);
-      if (layouts && layouts.length > 0) {
-        return layouts;
+      try {
+        const layouts = JSON.parse(settings[0].value);
+        console.log('Parsed layouts:', {
+          count: layouts?.length,
+          layouts: layouts?.map((l: any) => ({ id: l.id, name: l.name }))
+        });
+        
+        // Return layouts even if empty array - don't create default if empty
+        // Only create default if the setting doesn't exist at all
+        if (Array.isArray(layouts)) {
+          // Return the layouts array, even if empty
+          // Empty array means user deleted all layouts, not that we need to create default
+          return layouts;
+        }
+      } catch (parseError) {
+        console.error('Error parsing layouts JSON:', parseError);
+        console.error('Raw value:', settings[0].value);
+        // If parsing fails, return empty array instead of creating default
+        return [];
       }
     }
     
-    // No layouts exist, create and save default layout
+    // No settings entry exists at all, create and save default layout
+    console.log('No labelLayouts setting found, creating default layout');
     const defaultLayout = createDefaultLayout();
     await saveLabelLayouts([defaultLayout]);
     return [defaultLayout];
@@ -45,17 +64,37 @@ export const getLabelLayouts = async (): Promise<LabelLayouts> => {
  */
 export const saveLabelLayouts = async (layouts: LabelLayouts): Promise<void> => {
   try {
+    // Ensure layouts is an array
+    if (!Array.isArray(layouts)) {
+      throw new Error('Layouts must be an array');
+    }
+
     const settingData = {
       key: SETTINGS_KEY,
       value: JSON.stringify(layouts)
     };
 
-    await jsonpRequest('Settings', {
+    console.log('Saving label layouts:', {
+      key: SETTINGS_KEY,
+      layoutsCount: layouts.length,
+      layouts: layouts.map(l => ({ id: l.id, name: l.name })),
+      valueLength: settingData.value.length
+    });
+
+    const response = await jsonpRequest<{ status: string; key: string; value: string; updatedAt: string }>('Settings', {
       action: 'updateSetting',
       data: JSON.stringify(settingData)
     });
+
+    console.log('Label layouts save response:', response);
+
+    if (response && response.status === 'ok') {
+      console.log('✅ Label layouts saved successfully');
+    } else {
+      console.warn('⚠️ Unexpected response format:', response);
+    }
   } catch (error) {
-    console.error('Error saving label layouts:', error);
+    console.error('❌ Error saving label layouts:', error);
     throw error;
   }
 };

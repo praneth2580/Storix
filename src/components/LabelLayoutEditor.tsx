@@ -149,6 +149,7 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
       createdAt: layout?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    console.log('savedLayout', savedLayout);
     onSave(savedLayout);
   };
 

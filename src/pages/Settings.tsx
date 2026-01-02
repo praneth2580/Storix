@@ -1,54 +1,110 @@
 import React, { useState, useEffect } from 'react';
-import { User, Globe, Database, Moon, Sun, Shield, Save, RefreshCw, CheckCircle2, Package, Plus, Edit, Trash2, Copy, X } from 'lucide-react';
+import { User, Globe, Database, Moon, Sun, Shield, Save, RefreshCw, CheckCircle2, Package, Plus, Edit, Trash2, Copy, X, Store, QrCode } from 'lucide-react';
 import { LabelLayoutEditor } from '../components/LabelLayoutEditor';
 import { LabelLayout } from '../types/labelLayout';
-import { getLabelLayouts, saveLabelLayouts } from '../models/settings';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  fetchStoreSettings,
+  saveStoreSettings,
+  fetchLabelLayouts,
+  saveLabelLayoutsThunk,
+  updateStoreSettings,
+} from '../store/slices/settingsSlice';
+
 interface SettingsProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
 }
+
 export function Settings({
   theme,
   onToggleTheme
 }: SettingsProps) {
-  const [labelLayouts, setLabelLayouts] = useState<LabelLayout[]>([]);
+  const dispatch = useAppDispatch();
+  
+  // Redux state
+  const { storeSettings, storeSettingsLoading } = useAppSelector(state => ({
+    storeSettings: state.settings.storeSettings,
+    storeSettingsLoading: state.settings.storeSettingsLoading,
+  }));
+  
+  const { labelLayouts, labelLayoutsLoading } = useAppSelector(state => ({
+    labelLayouts: state.settings.labelLayouts,
+    labelLayoutsLoading: state.settings.labelLayoutsLoading,
+  }));
+
+  // Local UI state
   const [editingLayout, setEditingLayout] = useState<LabelLayout | null>(null);
   const [showNewLayoutForm, setShowNewLayoutForm] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [newLayoutForm, setNewLayoutForm] = useState({
     name: '',
     rows: 2,
     cols: 2,
   });
+  const [localStoreSettings, setLocalStoreSettings] = useState(storeSettings);
 
   useEffect(() => {
-    loadLabelLayouts();
-  }, []);
+    dispatch(fetchStoreSettings());
+    dispatch(fetchLabelLayouts());
+  }, [dispatch]);
 
-  const loadLabelLayouts = async () => {
+  // Sync local state when Redux state changes
+  useEffect(() => {
+    setLocalStoreSettings(storeSettings);
+  }, [storeSettings]);
+
+  const handleSaveStoreSettings = async () => {
     try {
-      setLoading(true);
-      const layouts = await getLabelLayouts();
-      setLabelLayouts(layouts);
+      await dispatch(saveStoreSettings(localStoreSettings)).unwrap();
+      alert('Store settings saved successfully!');
     } catch (error) {
-      console.error('Error loading label layouts:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error saving store settings:', error);
+      alert('Failed to save store settings. Please try again.');
     }
   };
 
   const handleSaveLayout = async (layout: LabelLayout) => {
+    console.log('handleSaveLayout', layout);
     try {
-      const updatedLayouts = editingLayout
-        ? labelLayouts.map(l => l.id === layout.id ? layout : l)
-        : [...labelLayouts, layout];
+      // const updatedLayouts = editingLayout
+      //   ? labelLayouts.map(l => l.id === layout.id ? layout : l)
+      //   : [...labelLayouts, layout];
+      // console.log('updatedLayouts', updatedLayouts);
       
-      await saveLabelLayouts(updatedLayouts);
-      setLabelLayouts(updatedLayouts);
+      // console.log('Saving layout:', {
+      //   isEditing: !!editingLayout,
+      //   layoutId: layout.id,
+      //   layoutName: layout.name,
+      //   totalLayouts: updatedLayouts.length,
+      //   allLayoutIds: updatedLayouts.map(l => l.id)
+      // });
+
+      const updatedLayouts = labelLayouts.values;
+      if (updatedLayouts.find(l => l.id === layout.id)) {
+        updatedLayouts[updatedLayouts.findIndex(l => l.id === layout.id)] = layout;
+      } else {
+        updatedLayouts.push(layout);
+      }
+
+      // Save to backend - this will update Redux state via the fulfilled action
+      const result = await dispatch(saveLabelLayoutsThunk(updatedLayouts)).unwrap();
+      console.log('Save result (should match updatedLayouts):', {
+        savedCount: result.length,
+        savedIds: result.map(l => l.id),
+        expectedCount: updatedLayouts.length,
+        expectedIds: updatedLayouts.map(l => l.id)
+      });
+      
       setEditingLayout(null);
+      
+      // Redux state is automatically updated by saveLabelLayoutsThunk.fulfilled
+      // No need to reload - the state already has the correct data
+      // The UI will re-render automatically when Redux state updates
+      
+      alert('Label layout saved successfully!');
     } catch (error) {
       console.error('Error saving label layout:', error);
-      alert('Failed to save layout. Please try again.');
+      alert(`Failed to save layout: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -57,8 +113,16 @@ export function Settings({
     
     try {
       const updatedLayouts = labelLayouts.filter(l => l.id !== id);
-      await saveLabelLayouts(updatedLayouts);
-      setLabelLayouts(updatedLayouts);
+      const result = await dispatch(saveLabelLayoutsThunk(updatedLayouts)).unwrap();
+      console.log('Delete result:', {
+        remainingCount: result.length,
+        remainingIds: result.map(l => l.id)
+      });
+      
+      // Redux state is automatically updated by saveLabelLayoutsThunk.fulfilled
+      // No need to reload - the state already has the correct data
+      
+      alert('Label layout deleted successfully!');
     } catch (error) {
       console.error('Error deleting label layout:', error);
       alert('Failed to delete layout. Please try again.');
@@ -177,6 +241,162 @@ export function Settings({
               </select>
             </div>
           </div>
+        </section>
+
+        {/* Store/POS Settings Section */}
+        <section className="bg-secondary border border-border-primary p-6 rounded-lg">
+          <h2 className="text-lg font-bold mb-6 flex items-center gap-2 pb-2 border-b border-border-primary">
+            <Store size={18} className="text-accent-blue" /> Store & POS Settings
+          </h2>
+          {storeSettingsLoading ? (
+            <div className="text-center text-text-muted py-8">Loading store settings...</div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    Shop/Store Name *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={localStoreSettings.shopName}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, shopName: e.target.value })}
+                    placeholder="e.g. Storix POS"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    Store Name (Alternative)
+                  </label>
+                  <input 
+                    type="text" 
+                    value={localStoreSettings.storeName}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, storeName: e.target.value })}
+                    placeholder="Alternative store name"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    Store Address
+                  </label>
+                  <input 
+                    type="text" 
+                    value={localStoreSettings.storeAddress}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, storeAddress: e.target.value })}
+                    placeholder="123 Business Street"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    City
+                  </label>
+                  <input 
+                    type="text" 
+                    value={localStoreSettings.storeCity}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, storeCity: e.target.value })}
+                    placeholder="City"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    State
+                  </label>
+                  <input 
+                    type="text" 
+                    value={localStoreSettings.storeState}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, storeState: e.target.value })}
+                    placeholder="State"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    ZIP Code
+                  </label>
+                  <input 
+                    type="text" 
+                    value={localStoreSettings.storeZip}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, storeZip: e.target.value })}
+                    placeholder="12345"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    Email
+                  </label>
+                  <input 
+                    type="email" 
+                    value={localStoreSettings.storeEmail}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, storeEmail: e.target.value })}
+                    placeholder="info@storix.com"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                    Phone
+                  </label>
+                  <input 
+                    type="tel" 
+                    value={localStoreSettings.storePhone}
+                    onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, storePhone: e.target.value })}
+                    placeholder="(555) 123-4567"
+                    className="w-full bg-primary border border-border-primary p-2 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                  />
+                </div>
+              </div>
+
+              {/* UPI Payment Settings */}
+              <div className="pt-4 border-t border-border-primary">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                  <QrCode size={16} className="text-purple-500" /> UPI Payment Settings
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                      UPI Merchant ID *
+                    </label>
+                    <input 
+                      type="text" 
+                      value={localStoreSettings.upiMerchantId}
+                      onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, upiMerchantId: e.target.value })}
+                      placeholder="your-merchant@paytm"
+                      className="w-full bg-primary border border-border-primary p-2 text-sm font-mono focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                    />
+                    <p className="text-xs text-text-muted mt-1">Used for generating UPI payment QR codes</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
+                      Merchant UPI (Alternative)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={localStoreSettings.merchantUPI}
+                      onChange={(e) => setLocalStoreSettings({ ...localStoreSettings, merchantUPI: e.target.value })}
+                      placeholder="Alternative UPI ID"
+                      className="w-full bg-primary border border-border-primary p-2 text-sm font-mono focus:border-accent-blue focus:outline-none rounded-sm transition-colors" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-border-primary">
+                <button 
+                  onClick={handleSaveStoreSettings}
+                  disabled={storeSettingsLoading}
+                  className="bg-accent-blue hover:bg-blue-600 text-white px-6 py-2 rounded-sm flex items-center gap-2 font-medium shadow-lg shadow-blue-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save size={18} />
+                  {storeSettingsLoading ? 'Saving...' : 'Save Store Settings'}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Integrations Section */}
@@ -317,7 +537,7 @@ export function Settings({
             </div>
           )}
 
-          {loading ? (
+          {labelLayoutsLoading ? (
             <div className="text-center text-text-muted py-8">Loading layouts...</div>
           ) : labelLayouts.length === 0 ? (
             <div className="text-center text-text-muted py-8">

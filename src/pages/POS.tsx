@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Search, ScanBarcode, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, X, CheckCircle2, RotateCcw, Download } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { useAppSelector, useDataPolling } from '../store/hooks';
+import { useAppSelector, useAppDispatch, useDataPolling } from '../store/hooks';
 import { fetchProducts } from '../store/slices/inventorySlice';
+import { fetchStoreSettings } from '../store/slices/settingsSlice';
 import { IProduct } from '../types/models';
 
 type CartItem = IProduct & {
@@ -10,8 +11,13 @@ type CartItem = IProduct & {
 };
 export function POS() {
   // Redux
+  const dispatch = useAppDispatch();
   useDataPolling(fetchProducts, 60000); // 1 min poll for POS
   const { items: products, loading } = useAppSelector(state => state.inventory);
+  
+  // Settings from Redux
+  const settingsMap = useAppSelector(state => state.settings.settingsMap);
+  const storeSettings = useAppSelector(state => state.settings.storeSettings);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
@@ -23,6 +29,11 @@ export function POS() {
   const [showUPIQr, setShowUPIQr] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scanContainerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch settings on component mount
+  useEffect(() => {
+    dispatch(fetchStoreSettings());
+  }, [dispatch]);
 
   // Filter products
   const filteredProducts = products.filter(p => {
@@ -121,31 +132,52 @@ export function POS() {
   };
   const clearCart = () => setCart([]);
   // Totals
-  const subtotal = cart.reduce((sum, item) => sum + item.defaultSellingPrice * item.quantity, 0);
+  const subtotal = cart.reduce((sum, item) => sum + (item.defaultSellingPrice || 0) * item.quantity, 0);
   const tax = subtotal * 0.08;
   const total = subtotal + tax;
 
-  // UPI QR Code Generation
-  const generateUPIQRCode = () => {
+  // UPI QR Code Generation - uses settings with proper fallbacks
+  const generateUPIQRCode = useCallback(() => {
     // UPI payment URL format: upi://pay?pa=<merchant_vpa>&pn=<merchant_name>&am=<amount>&cu=INR&tn=<transaction_note>
-    const merchantVPA = 'storix@paytm'; // Replace with actual merchant UPI ID
-    const merchantName = 'Storix POS';
+    const merchantVPA = storeSettings.upiMerchantId || storeSettings.merchantUPI || '';
+    const merchantName = storeSettings.shopName || storeSettings.storeName || 'Storix POS';
     const amount = total.toFixed(2);
     const transactionNote = `Payment for Order #${Date.now().toString().slice(-8)}`;
+    
+    // Validate merchant VPA
+    if (!merchantVPA || merchantVPA === 'your-merchant@paytm') {
+      console.warn('UPI Merchant ID not configured. Please set it in Settings.');
+      // Return a placeholder QR or show error
+      return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&ecc=M&data=${encodeURIComponent('Please configure UPI Merchant ID in Settings')}`;
+    }
     
     const upiUrl = `upi://pay?pa=${merchantVPA}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
     
     // Generate QR code using QR Server API
-    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiUrl)}`;
-  };
+    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&ecc=M&data=${encodeURIComponent(upiUrl)}`;
+  }, [storeSettings, total]);
 
   const handleQRPaymentClick = () => {
     setPaymentMethod('qr');
-    if (cart.length > 0) {
-      setShowUPIQr(true);
-    }
   };
+  
   const handleCheckout = () => {
+    // If QR payment is selected, show QR code modal
+    if (paymentMethod === 'qr') {
+      setShowUPIQr(true);
+      return;
+    }
+    
+    // For other payment methods, proceed with normal checkout
+    setIsCheckingOut(true);
+    setTimeout(() => {
+      setIsCheckingOut(false);
+      setShowReceipt(true);
+    }, 1500);
+  };
+
+  const handleQRPaymentDone = () => {
+    setShowUPIQr(false);
     setIsCheckingOut(true);
     setTimeout(() => {
       setIsCheckingOut(false);
@@ -392,12 +424,11 @@ export function POS() {
           <div class="info-grid">
             <div class="info-section">
               <h3>Store Information</h3>
-              <p><strong>STORIX POS</strong></p>
-              <p>Store #404 - Terminal 1</p>
-              <p>123 Business Street</p>
-              <p>City, State 12345</p>
-              <p>Email: info@storix.com</p>
-              <p>Phone: (555) 123-4567</p>
+              <p><strong>${storeSettings.shopName || storeSettings.storeName || 'STORIX POS'}</strong></p>
+              <p>${storeSettings.storeAddress || 'Store Address'}</p>
+              <p>${storeSettings.storeCity || 'City'}, ${storeSettings.storeState || 'State'} ${storeSettings.storeZip || '12345'}</p>
+              <p>Email: ${storeSettings.storeEmail || 'info@storix.com'}</p>
+              <p>Phone: ${storeSettings.storePhone || '(555) 123-4567'}</p>
             </div>
             <div class="info-section">
               <h3>Transaction Details</h3>
@@ -497,7 +528,7 @@ export function POS() {
               className="h-16 w-full object-contain mx-auto"
             />
           </div>
-          <p className="text-sm">Store #404 - Terminal 1</p>
+          <p className="text-sm">{storeSettings.shopName || storeSettings.storeName || 'Store'} - Terminal 1</p>
           <p className="text-sm">{new Date().toLocaleString()}</p>
         </div>
 
@@ -562,53 +593,74 @@ export function POS() {
             </button>
           </div>
           
-          <div className="bg-white p-6 rounded-lg flex flex-col items-center mb-4">
-            <div className="mb-4">
-              <img 
-                src={generateUPIQRCode()} 
-                alt="UPI Payment QR Code" 
-                className="w-64 h-64 border-2 border-border-primary rounded-lg"
-              />
+          {(!storeSettings.upiMerchantId && !storeSettings.merchantUPI) ? (
+            <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg mb-4">
+              <p className="text-sm text-yellow-800 font-semibold mb-2">UPI Merchant ID Not Configured</p>
+              <p className="text-xs text-yellow-700 mb-4">
+                Please configure your UPI Merchant ID in Settings → Store & POS Settings to generate payment QR codes.
+              </p>
+              <button
+                onClick={() => setShowUPIQr(false)}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-sm text-sm font-medium transition-colors"
+              >
+                Close
+              </button>
             </div>
-            <div className="text-center space-y-2">
-              <p className="text-sm font-semibold text-gray-800">Amount to Pay</p>
-              <p className="text-2xl font-bold text-accent-blue">₹{total.toFixed(2)}</p>
-              <p className="text-xs text-gray-600 mt-2">Scan with any UPI app</p>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="bg-white p-6 rounded-lg flex flex-col items-center mb-4">
+                <div className="mb-4">
+                  <img 
+                    src={generateUPIQRCode()} 
+                    alt="UPI Payment QR Code" 
+                    className="w-64 h-64 rounded-lg"
+                    onError={(e) => {
+                      console.error('Failed to load QR code image');
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EQR Code Error%3C/text%3E%3C/svg%3E';
+                    }}
+                  />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-semibold text-gray-800">Amount to Pay</p>
+                  <p className="text-2xl font-bold text-accent-blue">₹{total.toFixed(2)}</p>
+                  <p className="text-xs text-gray-600 mt-2">Scan with any UPI app</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Merchant: {storeSettings.shopName || storeSettings.storeName || 'Storix POS'}
+                  </p>
+                </div>
+              </div>
 
-          <div className="space-y-2 text-sm text-text-muted mb-4">
-            <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span className="font-mono">₹{subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tax (8%):</span>
-              <span className="font-mono">₹{tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t border-border-primary font-semibold text-text-primary">
-              <span>Total:</span>
-              <span className="font-mono">₹{total.toFixed(2)}</span>
-            </div>
-          </div>
+              <div className="space-y-2 text-sm text-text-muted mb-4">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span className="font-mono">₹{subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tax (8%):</span>
+                  <span className="font-mono">₹{tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-border-primary font-semibold text-text-primary">
+                  <span>Total:</span>
+                  <span className="font-mono">₹{total.toFixed(2)}</span>
+                </div>
+              </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowUPIQr(false)}
-              className="flex-1 bg-secondary hover:bg-tertiary border border-border-primary text-text-primary py-2.5 font-medium rounded-sm transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                setShowUPIQr(false);
-                handleCheckout();
-              }}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2.5 font-medium rounded-sm transition-colors flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 size={16} /> Payment Done
-            </button>
-          </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowUPIQr(false)}
+                  className="flex-1 bg-secondary hover:bg-tertiary border border-border-primary text-text-primary py-2.5 font-medium rounded-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleQRPaymentDone}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2.5 font-medium rounded-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 size={16} /> Payment Done
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     )}
