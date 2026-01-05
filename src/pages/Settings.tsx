@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Globe, Database, Moon, Sun, Shield, Save, RefreshCw, CheckCircle2, Package, Plus, Edit, Trash2, Copy, X, Store, QrCode } from 'lucide-react';
+import { User, Globe, Database, Moon, Sun, Shield, Save, RefreshCw, CheckCircle2, Package, Plus, Edit, Trash2, Copy, X, Store, QrCode, AlertTriangle } from 'lucide-react';
 import { LabelLayoutEditor } from '../components/LabelLayoutEditor';
 import { LabelLayout } from '../types/labelLayout';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -504,23 +504,64 @@ export function Settings({
                   <br />
                   <span className="text-accent-blue">Note:</span> Changing this will require a page reload to take effect.
                 </p>
+                <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={14} className="text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-text-muted">
+                      <strong className="text-yellow-500">Mobile Troubleshooting:</strong> If you're experiencing connection errors on mobile, ensure:
+                      <ul className="list-disc list-inside mt-1 space-y-0.5">
+                        <li>Script is deployed as "Web app" (not "API executable")</li>
+                        <li>Execute as: "Me"</li>
+                        <li>Who has access: "Anyone" (or "Anyone with Google account")</li>
+                        <li>Use the "Test & Save" button to verify connection</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-border-primary">
                 <button
-                  onClick={() => {
-                    if (googleScriptId.trim()) {
-                      localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', googleScriptId.trim());
-                      alert('Google Script ID updated! The page will reload to apply changes.');
-                      window.location.reload();
-                    } else {
+                  onClick={async (e) => {
+                    if (!googleScriptId.trim()) {
                       alert('Please enter a valid Google Script ID.');
+                      return;
+                    }
+                    
+                    const button = e.currentTarget;
+                    const originalHTML = button.innerHTML;
+                    button.disabled = true;
+                    button.innerHTML = '<span>⏳ Testing...</span>';
+                    
+                    try {
+                      // Test connection before saving
+                      const { testScriptConnection } = await import('../utils/scriptTester');
+                      const testResult = await testScriptConnection(googleScriptId.trim());
+                      
+                      if (testResult.success) {
+                        localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', googleScriptId.trim());
+                        alert(`✅ Connection test successful!\nResponse time: ${testResult.details?.responseTime}ms\n\nThe page will reload to apply changes.`);
+                        window.location.reload();
+                      } else {
+                        const errorMsg = `❌ Connection test failed!\n\nError: ${testResult.error}\n\nCommon mobile issues:\n1. Script not deployed as "Web app"\n2. Access not set to "Anyone"\n3. CORS/CSP restrictions\n4. Network blocking script tags\n\nCheck the Logs page for detailed error information.`;
+                        alert(errorMsg);
+                        // Ask if user wants to save anyway
+                        if (confirm('Do you want to save the Script ID anyway? (You can test it later)')) {
+                          localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', googleScriptId.trim());
+                          window.location.reload();
+                        }
+                      }
+                    } catch (err) {
+                      alert(`Test failed: ${err instanceof Error ? err.message : String(err)}`);
+                    } finally {
+                      button.disabled = false;
+                      button.innerHTML = originalHTML;
                     }
                   }}
-                  className="bg-accent-blue hover:bg-blue-600 text-white px-4 py-2 rounded-sm flex items-center gap-2 text-sm font-medium transition-colors"
+                  className="bg-accent-blue hover:bg-blue-600 text-white px-4 py-2 rounded-sm flex items-center gap-2 text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   <Save size={16} />
-                  Save Script ID
+                  Test & Save Script ID
                 </button>
               </div>
             </div>

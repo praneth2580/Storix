@@ -41,6 +41,7 @@ import { Reports } from './pages/Reports'
 import { Logs } from './pages/Logs'
 import { Menu } from 'lucide-react'
 import { SnackbarContainer } from './components/Snackbar'
+import { NetworkStatus } from './components/NetworkStatus'
 import { useAppSelector, useAppDispatch } from './store/hooks'
 import { removeSnackbar } from './store/slices/snackbarSlice'
 
@@ -218,6 +219,9 @@ export function App() {
           )}
       </main>
 
+      {/* Network Status */}
+      <NetworkStatus />
+      
       {/* Snackbar Container */}
       <SnackbarContainer
         messages={snackbarMessages}

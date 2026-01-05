@@ -40,19 +40,43 @@ export const useDataPolling = (action: any, intervalMs: number = 20000, source?:
                     const actionName = action.typePrefix || source || 'Data';
                     const errorMessage = error?.message || error?.toString() || 'Unknown error';
                     
+                    // Extract detailed error info
+                    let errorDetails = errorMessage;
+                    try {
+                        const detailsMatch = errorMessage.match(/Details: ({.*})/);
+                        if (detailsMatch) {
+                            const parsed = JSON.parse(detailsMatch[1]);
+                            errorDetails = `Error Type: ${parsed.errorType || 'Unknown'}\nSheet: ${parsed.sheet || 'N/A'}\nScript ID: ${parsed.scriptId || 'N/A'}\nOnline: ${parsed.isOnline ? 'Yes' : 'No'}\nUser Agent: ${parsed.userAgent || 'N/A'}\nTime: ${parsed.timestamp || 'N/A'}\nURL: ${parsed.url || 'N/A'}\n\nFull Error: ${errorMessage}`;
+                        }
+                    } catch {
+                        errorDetails = errorMessage;
+                    }
+                    
+                    // Create user-friendly message
+                    let userMessage = errorMessage;
+                    if (errorMessage.includes('TIMEOUT')) {
+                        userMessage = 'Request timed out. Check your connection.';
+                    } else if (errorMessage.includes('OFFLINE')) {
+                        userMessage = 'Device is offline.';
+                    } else if (errorMessage.includes('MISSING_SCRIPT_ID')) {
+                        userMessage = 'Script ID not configured.';
+                    } else if (errorMessage.includes('SCRIPT_LOAD_ERROR')) {
+                        userMessage = 'Failed to connect. Check Script ID.';
+                    }
+                    
                     // Show snackbar notification
                     dispatch(addSnackbar({
-                        message: `Failed to load ${actionName}: ${errorMessage}`,
+                        message: `Failed to load ${actionName}: ${userMessage}`,
                         type: 'error',
-                        duration: 6000,
+                        duration: 8000,
                     }));
                     
-                    // Log error
+                    // Log detailed error
                     dispatch(addLog({
                         level: 'error',
                         message: `Failed to load ${actionName}`,
                         source: source || actionName,
-                        details: errorMessage,
+                        details: errorDetails,
                     }));
                 });
         }
@@ -92,19 +116,43 @@ export const useDataPolling = (action: any, intervalMs: number = 20000, source?:
                         const actionName = action.typePrefix || source || 'Data';
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
                         
+                        // Extract detailed error info
+                        let errorDetails = errorMessage;
+                        try {
+                            const detailsMatch = errorMessage.match(/Details: ({.*})/);
+                            if (detailsMatch) {
+                                const parsed = JSON.parse(detailsMatch[1]);
+                                errorDetails = `Error Type: ${parsed.errorType || 'Unknown'}\nSheet: ${parsed.sheet || 'N/A'}\nScript ID: ${parsed.scriptId || 'N/A'}\nOnline: ${parsed.isOnline ? 'Yes' : 'No'}\nUser Agent: ${parsed.userAgent || 'N/A'}\nTime: ${parsed.timestamp || 'N/A'}\nURL: ${parsed.url || 'N/A'}\n\nFull Error: ${errorMessage}`;
+                            }
+                        } catch {
+                            errorDetails = errorMessage;
+                        }
+                        
+                        // Create user-friendly message
+                        let userMessage = errorMessage;
+                        if (errorMessage.includes('TIMEOUT')) {
+                            userMessage = 'Request timed out. Check your connection.';
+                        } else if (errorMessage.includes('OFFLINE')) {
+                            userMessage = 'Device is offline.';
+                        } else if (errorMessage.includes('MISSING_SCRIPT_ID')) {
+                            userMessage = 'Script ID not configured.';
+                        } else if (errorMessage.includes('SCRIPT_LOAD_ERROR')) {
+                            userMessage = 'Failed to connect. Check Script ID.';
+                        }
+                        
                         // Show snackbar notification
                         dispatch(addSnackbar({
-                            message: `Failed to update ${actionName}: ${errorMessage}`,
+                            message: `Failed to update ${actionName}: ${userMessage}`,
                             type: 'error',
-                            duration: 6000,
+                            duration: 8000,
                         }));
                         
-                        // Log error
+                        // Log detailed error
                         dispatch(addLog({
                             level: 'error',
                             message: `Failed to update ${actionName}`,
                             source: source || actionName,
-                            details: errorMessage,
+                            details: errorDetails,
                         }));
                     });
             }

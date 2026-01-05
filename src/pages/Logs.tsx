@@ -356,7 +356,7 @@ export function Logs() {
                           </div>
                         </div>
                         {entry.details && (
-                          <div className="text-xs text-text-muted mt-1 font-mono bg-primary/50 p-2 rounded border border-border-primary">
+                          <div className="text-xs text-text-muted mt-1 font-mono bg-primary/50 p-2 rounded border border-border-primary whitespace-pre-wrap break-words">
                             {entry.details}
                           </div>
                         )}

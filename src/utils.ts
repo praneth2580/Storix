@@ -57,10 +57,14 @@ interface RequestItem {
   params: Record<string, string>;
   resolve: (value: any) => void;
   reject: (reason?: any) => void;
+  retryCount?: number;
 }
 
 const requestQueue: RequestItem[] = [];
 let isProcessingQueue = false;
+const JSONP_TIMEOUT = 30000; // 30 seconds timeout
+const MAX_RETRIES = 2; // Maximum retry attempts
+const RETRY_DELAY = 2000; // 2 seconds delay between retries
 
 const processQueue = () => {
   if (requestQueue.length === 0) {
@@ -69,21 +73,67 @@ const processQueue = () => {
   }
 
   isProcessingQueue = true;
-  const { sheet, params, resolve, reject } = requestQueue[0];
+  const requestItem = requestQueue[0];
+  const { sheet, params, resolve, reject } = requestItem;
+  const retryCount = requestItem.retryCount || 0;
   const callbackName = "storix"; // Fixed callback name from backend
+  let timeoutId: NodeJS.Timeout | null = null;
+  let script: HTMLScriptElement | null = null;
+  let isResolved = false;
 
-  // Define the global callback
+  // Enhanced error details for mobile debugging
+  const getErrorDetails = (errorType: string, additionalInfo?: string) => {
+    const scriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
+    const userAgent = navigator.userAgent;
+    const isOnline = navigator.onLine;
+    const url = script ? script.src : 'N/A';
+    
+    return {
+      errorType,
+      sheet,
+      params: JSON.stringify(params),
+      scriptId: scriptId ? `${scriptId.substring(0, 8)}...` : 'MISSING',
+      url,
+      userAgent: userAgent.substring(0, 100), // Truncate for storage
+      isOnline,
+      timestamp: new Date().toISOString(),
+      additionalInfo,
+    };
+  };
+
+  // Define the global callback - ensure it's set up before script loads
+  if (!(window as any)[callbackName]) {
+    (window as any)[callbackName] = (response: any) => {
+      // This will be handled by the request-specific handler below
+    };
+  }
+  
+  // Store the original callback to restore later if needed
+  const originalCallback = (window as any)[callbackName];
+  
+  // Define request-specific callback handler
   (window as any)[callbackName] = (response: any) => {
+    // Only handle if this is for our current request
+    if (isResolved) return; // Prevent double resolution
+    isResolved = true;
+    
     try {
       let data = response;
       // Handle wrapped format: { data: [...] } if applicable, though typically backend returns direct obj or array
       // The new backend seems to return obj directly or { results: ... } for batch
 
-      resolve(data);
-    } catch (err) {
-      reject(err);
-    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       cleanup();
+      resolve(data);
+      // Process next item
+      requestQueue.shift();
+      processQueue();
+    } catch (err) {
+      if (timeoutId) clearTimeout(timeoutId);
+      const errorDetails = getErrorDetails('PARSE_ERROR', err instanceof Error ? err.message : String(err));
+      const error = new Error(`Failed to parse response for ${sheet}. Details: ${JSON.stringify(errorDetails)}`);
+      cleanup();
+      reject(error);
       // Process next item
       requestQueue.shift();
       processQueue();
@@ -91,11 +141,16 @@ const processQueue = () => {
   };
 
   const cleanup = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
     // We don't delete window.storix because it's fixed, but we could nullify it if we wanted safety
     // (window as any)[callbackName] = undefined; 
     if (script && script.parentNode) {
       script.parentNode.removeChild(script);
     }
+    script = null;
   };
 
   const query = new URLSearchParams({
@@ -103,28 +158,86 @@ const processQueue = () => {
     ...params, // No 'callback' param needed as it's fixed in backend, but backend might ignore it
   }).toString();
 
-  const script = document.createElement("script");
+  script = document.createElement("script");
   const scriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
 
   if (!scriptId) {
-    reject(new Error("VITE_GOOGLE_SCRIPT_ID is missing in localStorage"));
+    const errorDetails = getErrorDetails('MISSING_SCRIPT_ID');
+    const error = new Error(`VITE_GOOGLE_SCRIPT_ID is missing in localStorage. Details: ${JSON.stringify(errorDetails)}`);
+    reject(error);
     // cleanup and move next
     requestQueue.shift();
     processQueue();
     return;
   }
 
+  // Check network status
+  if (!navigator.onLine) {
+    const errorDetails = getErrorDetails('OFFLINE');
+    const error = new Error(`Device is offline. Cannot fetch ${sheet}. Details: ${JSON.stringify(errorDetails)}`);
+    reject(error);
+    requestQueue.shift();
+    processQueue();
+    return;
+  }
+
   const scriptUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+  const fullUrl = `${scriptUrl}?${query}`;
 
-  // Just in case backend still looks for 'callback' param, though it shouldn't matter if it hardcodes 'storix' properties 
-  // checking script.js: const wrapped = JSONP_CALLBACK + "(" + payload + ");"; 
-  // It hardcodes it.
+  // Set up timeout
+  timeoutId = setTimeout(() => {
+    if (isResolved) return;
+    isResolved = true;
+    
+    // Retry logic for timeout
+    if (retryCount < MAX_RETRIES) {
+      cleanup();
+      // Wait before retrying
+      setTimeout(() => {
+        requestItem.retryCount = retryCount + 1;
+        // Re-add to queue for retry
+        requestQueue.unshift(requestItem);
+        isProcessingQueue = false;
+        processQueue();
+      }, RETRY_DELAY);
+      return;
+    }
+    
+    const errorDetails = getErrorDetails('TIMEOUT', `Request timed out after ${JSONP_TIMEOUT}ms (${retryCount + 1} attempts)`);
+    const error = new Error(`Request timeout for ${sheet} after ${JSONP_TIMEOUT}ms (${retryCount + 1} attempts). URL: ${fullUrl}. This may indicate: 1) Slow network connection, 2) Server overload, 3) Script execution timeout. Details: ${JSON.stringify(errorDetails)}`);
+    cleanup();
+    reject(error);
+    // Process next item
+    requestQueue.shift();
+    processQueue();
+  }, JSONP_TIMEOUT);
 
-  script.src = `${scriptUrl}?${query}`;
+  script.src = fullUrl;
   script.async = true;
   script.onerror = () => {
+    if (isResolved) return;
+    isResolved = true;
+    if (timeoutId) clearTimeout(timeoutId);
+    
+    // Retry logic for mobile network issues
+    if (retryCount < MAX_RETRIES) {
+      cleanup();
+      // Wait before retrying
+      setTimeout(() => {
+        requestItem.retryCount = retryCount + 1;
+        // Re-add to queue for retry
+        requestQueue.unshift(requestItem);
+        isProcessingQueue = false;
+        processQueue();
+      }, RETRY_DELAY);
+      return;
+    }
+    
+    const errorDetails = getErrorDetails('SCRIPT_LOAD_ERROR', `Script tag failed to load after ${retryCount + 1} attempts`);
+    const error = new Error(`JSONP script failed to load for ${sheet} after ${retryCount + 1} attempts. URL: ${fullUrl}. This may be due to: 1) CORS/CSP restrictions, 2) Network blocking, 3) Invalid Script ID, 4) Script deployment issues. Details: ${JSON.stringify(errorDetails)}`);
     cleanup();
-    reject(new Error(`JSONP request failed for ${sheet}`));
+    reject(error);
+    // Process next item
     requestQueue.shift();
     processQueue();
   };
