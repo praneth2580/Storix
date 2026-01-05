@@ -32,15 +32,26 @@ import { fetchSales } from '../store/slices/salesSlice';
 import { fetchPurchases } from '../store/slices/purchasesSlice';
 import { fetchProducts } from '../store/slices/inventorySlice';
 import { Loader2 } from 'lucide-react';
+import { Loader } from '../components/Loader';
 
 export function Reports() {
-    useDataPolling(fetchSales, 30000);
-    useDataPolling(fetchPurchases, 30000);
-    useDataPolling(fetchProducts, 30000);
+    useDataPolling(fetchSales, 30000, 'Sales');
+    useDataPolling(fetchPurchases, 30000, 'Purchases');
+    useDataPolling(fetchProducts, 30000, 'Products');
 
-    const { items: sales } = useAppSelector(state => state.sales);
-    const { items: purchases } = useAppSelector(state => state.purchases);
-    const { items: products } = useAppSelector(state => state.inventory);
+    const { items: sales, loading: salesLoading } = useAppSelector(state => state.sales);
+    const { items: purchases, loading: purchasesLoading } = useAppSelector(state => state.purchases);
+    const { items: products, loading: productsLoading } = useAppSelector(state => state.inventory);
+    
+    const loading = salesLoading || purchasesLoading || productsLoading;
+    
+    if (loading) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader message="Loading report data..." />
+            </div>
+        );
+    }
 
     const [reportType, setReportType] = useState<ReportType>('all')
     const [dateFrom, setDateFrom] = useState('2024-01-01')

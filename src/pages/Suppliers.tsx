@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Search, Plus, Edit, Trash2, Mail, Phone, MapPin, ExternalLink, X, Save, Users, Loader2 } from 'lucide-react';
 import { useAppSelector, useDataPolling } from '../store/hooks';
 import { fetchSuppliers } from '../store/slices/suppliersSlice';
+import { Loader } from '../components/Loader';
 
 export function Suppliers() {
   const { items: suppliers, loading } = useAppSelector(state => state.suppliers);
-  useDataPolling(fetchSuppliers, 30000);
+  useDataPolling(fetchSuppliers, 30000, 'Suppliers');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -36,8 +37,8 @@ export function Suppliers() {
     {/* Grid Content */}
     <div className="flex-1 overflow-auto p-6">
       {loading ? (
-        <div className="h-full flex items-center justify-center text-text-muted gap-2">
-          <Loader2 className="animate-spin" /> Loading suppliers...
+        <div className="h-full flex items-center justify-center">
+          <Loader message="Loading suppliers..." />
         </div>
       ) : filteredSuppliers.length === 0 ? (
         <div className="text-center text-text-muted mt-10">No suppliers found</div>

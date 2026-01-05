@@ -6,14 +6,17 @@ import { fetchOrders } from '../store/slices/ordersSlice';
 import { fetchSales } from '../store/slices/salesSlice';
 import { ICustomer, IOrder } from '../types/models';
 import { Download } from 'lucide-react';
+import { Loader } from '../components/Loader';
 
 export function Customers() {
-    const { items: customers, loading } = useAppSelector(state => state.customers);
-    const { items: orders } = useAppSelector(state => state.orders);
-    const { items: sales } = useAppSelector(state => state.sales);
-    useDataPolling(fetchCustomers, 30000);
-    useDataPolling(fetchOrders, 30000);
-    useDataPolling(fetchSales, 30000);
+    const { items: customers, loading: customersLoading } = useAppSelector(state => state.customers);
+    const { items: orders, loading: ordersLoading } = useAppSelector(state => state.orders);
+    const { items: sales, loading: salesLoading } = useAppSelector(state => state.sales);
+    useDataPolling(fetchCustomers, 30000, 'Customers');
+    useDataPolling(fetchOrders, 30000, 'Orders');
+    useDataPolling(fetchSales, 30000, 'Sales');
+    
+    const loading = customersLoading || ordersLoading || salesLoading;
 
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
@@ -24,6 +27,14 @@ export function Customers() {
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         (c.phone && c.phone.includes(search))
     );
+    
+    if (loading) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader message="Loading customers..." />
+            </div>
+        );
+    }
 
     const handleSendMessage = (customer: ICustomer) => {
         if (!customer.phone) return alert("Customer has no phone number");

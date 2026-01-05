@@ -10,6 +10,7 @@ type CartItem = {
 import { useAppSelector, useDataPolling } from '../store/hooks';
 import { fetchProducts } from '../store/slices/inventorySlice';
 import { fetchSuppliers } from '../store/slices/suppliersSlice';
+import { Loader } from '../components/Loader';
 
 // Using cost price which might not be on IProduct directly? IProduct has 'price' (selling price).
 // Usually products have 'cost' price too. Checking IProduct definition...
@@ -20,11 +21,21 @@ import { fetchSuppliers } from '../store/slices/suppliersSlice';
 // I will just default cost to 0 or use price if that's all we have, but Purchase Entry usually sets the cost.
 // I'll leave cost as state that the user can edit.
 export function PurchaseEntry() {
-  useDataPolling(fetchProducts, 60000);
-  useDataPolling(fetchSuppliers, 60000); // Fetch suppliers too
+  useDataPolling(fetchProducts, 60000, 'Products');
+  useDataPolling(fetchSuppliers, 60000, 'Suppliers'); // Fetch suppliers too
 
-  const { items: products } = useAppSelector(state => state.inventory);
-  const { items: suppliers } = useAppSelector(state => state.suppliers);
+  const { items: products, loading: productsLoading } = useAppSelector(state => state.inventory);
+  const { items: suppliers, loading: suppliersLoading } = useAppSelector(state => state.suppliers);
+  
+  const loading = productsLoading || suppliersLoading;
+  
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader message="Loading products and suppliers..." />
+      </div>
+    );
+  }
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');

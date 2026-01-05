@@ -20,9 +20,9 @@ export function getElementValue(
     case 'variant-features':
       return formatAttributes(variant.attributes);
     case 'sku':
-      return variant.sku || variant.id || '';
+      return String(variant.sku || variant.id || '');
     case 'barcode':
-      return product.barcode || variant.sku || variant.id || '';
+      return String(product.barcode || variant.sku || variant.id || '');
     case 'price':
       const price = typeof variant.price === 'number' ? variant.price : 0;
       return `$${price.toFixed(2)}`;
@@ -38,6 +38,15 @@ export function getElementValue(
  * Generate CSS for a label element
  */
 export function generateElementCSS(element: LabelElement): string {
+  const backgroundColor = element.style.backgroundColor === 'transparent' || element.style.backgroundColor === '' 
+    ? 'transparent' 
+    : element.style.backgroundColor;
+  
+  // For barcode elements, ensure white background for better scanning
+  const finalBackgroundColor = element.type === 'barcode' && (backgroundColor === 'transparent' || backgroundColor === '')
+    ? '#ffffff'
+    : backgroundColor;
+  
   return `
     .label-element-${element.id} {
       position: absolute;
@@ -48,7 +57,7 @@ export function generateElementCSS(element: LabelElement): string {
       font-size: ${element.style.fontSize}px;
       font-weight: ${element.style.fontWeight};
       color: ${element.style.color};
-      background-color: ${element.style.backgroundColor};
+      background-color: ${finalBackgroundColor};
       padding: ${element.style.padding}mm;
       box-sizing: border-box;
       overflow: hidden;
@@ -90,6 +99,47 @@ export function generateElementHTML(
     `;
   }
 
+  // Special handling for barcode - render as scannable barcode image
+  if (element.type === 'barcode') {
+    // Ensure value is a string before calling trim
+    const barcodeValue = String(value || '').trim();
+    if (!barcodeValue) {
+      return `
+        <div class="label-element-${element.id}">
+          No Barcode
+        </div>
+      `;
+    }
+    
+    // If element is reasonably sized (width > 20mm and height > 8mm), render as barcode image
+    // Barcodes need more width than height for proper scanning
+    if (element.size.width > 20 && element.size.height > 8) {
+      // Convert mm to pixels (1mm ≈ 3.779px at 96 DPI)
+      const barcodeWidth = Math.round(element.size.width * 3.779);
+      const barcodeHeight = Math.round(element.size.height * 3.779);
+      
+      // Use Code128 barcode format (most common for product barcodes)
+      // Using barcode.tec-it.com API which supports Code128
+      const barcodeUrl = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeValue)}&code=Code128&translate-esc=on&dpi=96&unit=Pixel&dmsize=Default&imagetype=Gif&rotation=0&color=%23000000&bgcolor=%23FFFFFF&qunit=Mm&quiet=0&modulewidth=0.5&height=${element.size.height}&width=${element.size.width}`;
+      
+      return `
+        <div class="label-element-${element.id}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+          <img src="${barcodeUrl}" alt="Barcode: ${barcodeValue}" style="max-width: 100%; max-height: calc(100% - 12px); object-fit: contain; image-rendering: crisp-edges;" />
+          <div style="font-size: ${Math.max(8, element.style.fontSize * 0.7)}px; text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis;">
+            ${barcodeValue}
+          </div>
+        </div>
+      `;
+    }
+    
+    // Small barcode element - render as text
+    return `
+      <div class="label-element-${element.id}">
+        Barcode: ${value}
+      </div>
+    `;
+  }
+
   return `
     <div class="label-element-${element.id}">
       ${value}
@@ -104,10 +154,12 @@ export function generateLabelHTML(
   layout: LabelLayout,
   product: InventoryProduct,
   variant: IVariant,
-  formatAttributes: (attrs: Record<string, string> | string) => string
+  formatAttributes: (attrs: Record<string, string> | string) => string,
+  backgroundImage?: string
 ): string {
-  const backgroundStyle = layout.backgroundImage
-    ? `background-image: url('${layout.backgroundImage}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
+  const imageToUse = backgroundImage || layout.backgroundImage;
+  const backgroundStyle = imageToUse
+    ? `background-image: url('${imageToUse}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
     : 'background: #ffffff;';
 
   const elementsHTML = layout.elements
@@ -142,7 +194,8 @@ export function generateLabelsPageHTML(
   layout: LabelLayout,
   variants: IVariant[],
   product: InventoryProduct,
-  formatAttributes: (attrs: Record<string, string> | string) => string
+  formatAttributes: (attrs: Record<string, string> | string) => string,
+  backgroundImage?: string
 ): string {
   const pageWidth = layout.pageSize.width;
   const pageHeight = layout.pageSize.height;
@@ -164,7 +217,7 @@ export function generateLabelsPageHTML(
     const labelX = margin + col * (labelWidth + margin);
     const labelY = margin + row * (labelHeight + margin);
 
-    const labelHTML = generateLabelHTML(layout, product, variant, formatAttributes);
+    const labelHTML = generateLabelHTML(layout, product, variant, formatAttributes, backgroundImage);
 
     // Start new page if needed
     if (labelIndexInPage === 0 && pageIndex > 0) {
@@ -188,9 +241,11 @@ export function generateLabelsPageHTML(
     }
   }
 
-  const backgroundStyle = layout.backgroundImage
-    ? `background-image: url('${layout.backgroundImage}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
-    : 'background: #f5f5f5;';
+  const pageBackgroundImage = backgroundImage || layout.backgroundImage;
+  // const backgroundStyle = pageBackgroundImage
+  //   ? `background-image: url('${pageBackgroundImage}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
+  //   : 'background: #f5f5f5;';
+  const backgroundStyle = 'background: #f5f5f5;';
 
   return `
     <!DOCTYPE html>

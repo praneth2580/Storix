@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Plus, Trash2, Move, Maximize2, Minimize2, Image as ImageIcon, GripVertical } from 'lucide-react';
 import { LabelLayout, LabelElement, LabelFieldType } from '../types/labelLayout';
+import { ImageInput } from './ImageInput';
 
 interface LabelLayoutEditorProps {
   layout: LabelLayout | null;
@@ -32,7 +33,7 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
   const [gridCols, setGridCols] = useState(layout?.grid.cols || 2);
   const [elements, setElements] = useState<LabelElement[]>(layout?.elements || []);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(layout?.backgroundImage || null);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null); // For reference/preview only, not saved
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -41,6 +42,16 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
   const margin = 5; // mm
   const labelWidth = (pageSize.width - margin * (gridCols + 1)) / gridCols;
   const labelHeight = (pageSize.height - margin * (gridRows + 1)) / gridRows;
+
+  // Sync state when layout prop changes
+  useEffect(() => {
+    if (layout) {
+      setLayoutName(layout.name || 'New Layout');
+      setGridRows(layout.grid?.rows || 2);
+      setGridCols(layout.grid?.cols || 2);
+      setElements(layout.elements || []);
+    }
+  }, [layout?.id]); // Only sync when layout ID changes (new layout selected)
 
   // Update label size when grid changes
   useEffect(() => {
@@ -126,30 +137,27 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
     setIsDragging(false);
   };
 
-  const handleBackgroundImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setBackgroundImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSave = () => {
+    // Don't save backgroundImage - it's only for reference/preview during editing
+    // Image will be requested during label generation
     const savedLayout: LabelLayout = {
       id: layout?.id || `layout-${Date.now()}`,
       name: layoutName,
       pageSize,
       grid: { rows: gridRows, cols: gridCols },
       labelSize: { width: labelWidth, height: labelHeight },
-      elements,
-      backgroundImage: backgroundImage || undefined,
+      elements: Array.isArray(elements) ? elements : [], // Ensure elements is always an array
+      // backgroundImage is not saved - only used for reference/preview
       createdAt: layout?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    console.log('savedLayout', savedLayout);
+    console.log('LabelLayoutEditor handleSave - savedLayout:', {
+      id: savedLayout.id,
+      name: savedLayout.name,
+      elementsCount: savedLayout.elements.length,
+      elements: savedLayout.elements,
+      fullLayout: JSON.stringify(savedLayout, null, 2)
+    });
     onSave(savedLayout);
   };
 
@@ -218,23 +226,14 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
             </div>
 
             <div className="mb-4">
-              <label className="text-xs text-text-muted uppercase font-bold tracking-wider mb-2 block">
-                Background Image
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleBackgroundImageChange}
-                className="w-full text-xs"
+              <ImageInput
+                value={backgroundImage}
+                onChange={setBackgroundImage}
+                label="Background Image (Reference Only)"
+                description="Image is for reference/preview only and won't be saved. You'll be asked for the image during label generation."
+                showPreview={true}
+                previewSize="md"
               />
-              {backgroundImage && (
-                <button
-                  onClick={() => setBackgroundImage(null)}
-                  className="mt-2 text-xs text-accent-red hover:underline"
-                >
-                  Remove Background
-                </button>
-              )}
             </div>
 
             <div className="mb-4 border-t border-border-primary pt-4">
@@ -307,11 +306,12 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
                   }
                 }}
               >
+                {/* Background image for reference/preview only */}
                 {backgroundImage && (
                   <img
                     src={backgroundImage}
-                    alt="Background"
-                    className="absolute inset-0 w-full h-full object-cover opacity-50"
+                    alt="Background Reference"
+                    className="absolute inset-0 w-full h-full object-cover opacity-50 pointer-events-none"
                   />
                 )}
                 {/* Grid overlay */}
@@ -327,7 +327,7 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
                     className={`absolute border-2 cursor-move ${
                       selectedElement === element.id
                         ? 'border-accent-blue bg-accent-blue/10'
-                        : 'border-border-primary bg-white/80'
+                        : 'border-border-primary'
                     }`}
                     style={{
                       left: `${element.position.x * previewScale}px`,
@@ -337,7 +337,9 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
                       fontSize: `${element.style.fontSize * previewScale}px`,
                       fontWeight: element.style.fontWeight,
                       color: element.style.color,
-                      backgroundColor: element.style.backgroundColor,
+                      backgroundColor: element.style.backgroundColor === 'transparent' || element.style.backgroundColor === '' 
+                        ? 'transparent' 
+                        : element.style.backgroundColor,
                       padding: `${element.style.padding * previewScale}px`,
                       zIndex: selectedElement === element.id ? 10 : 1,
                     }}
@@ -485,12 +487,29 @@ export function LabelLayoutEditor({ layout, onSave, onCancel }: LabelLayoutEdito
                     <label className="text-xs text-text-muted uppercase font-bold tracking-wider mb-1 block">
                       Background Color
                     </label>
-                    <input
-                      type="color"
-                      value={selectedElementData.style.backgroundColor}
-                      onChange={(e) => handleElementPropertyChange(selectedElementData.id, 'style', { backgroundColor: e.target.value })}
-                      className="w-full h-10 bg-secondary border border-border-primary rounded-sm cursor-pointer"
-                    />
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedElementData.style.backgroundColor === 'transparent' || selectedElementData.style.backgroundColor === ''}
+                        onChange={(e) => {
+                          handleElementPropertyChange(selectedElementData.id, 'style', { 
+                            backgroundColor: e.target.checked ? 'transparent' : '#ffffff' 
+                          });
+                        }}
+                        className="cursor-pointer"
+                      />
+                      <label className="text-xs text-text-muted cursor-pointer">
+                        Transparent Background
+                      </label>
+                    </div>
+                    {selectedElementData.style.backgroundColor !== 'transparent' && selectedElementData.style.backgroundColor !== '' && (
+                      <input
+                        type="color"
+                        value={selectedElementData.style.backgroundColor === 'transparent' ? '#ffffff' : selectedElementData.style.backgroundColor}
+                        onChange={(e) => handleElementPropertyChange(selectedElementData.id, 'style', { backgroundColor: e.target.value })}
+                        className="w-full h-10 bg-secondary border border-border-primary rounded-sm cursor-pointer"
+                      />
+                    )}
                   </div>
 
                   <div>

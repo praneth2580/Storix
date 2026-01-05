@@ -77,8 +77,14 @@ export const saveLabelLayouts = async (layouts: LabelLayouts): Promise<void> => 
     console.log('Saving label layouts:', {
       key: SETTINGS_KEY,
       layoutsCount: layouts.length,
-      layouts: layouts.map(l => ({ id: l.id, name: l.name })),
-      valueLength: settingData.value.length
+      layouts: layouts.map(l => ({ 
+        id: l.id, 
+        name: l.name,
+        elementsCount: l.elements?.length || 0,
+        elements: l.elements
+      })),
+      valueLength: settingData.value.length,
+      fullValue: settingData.value.substring(0, 500) // First 500 chars for debugging
     });
 
     const response = await jsonpRequest<{ status: string; key: string; value: string; updatedAt: string }>('Settings', {

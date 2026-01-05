@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Image as ImageIcon, X, Save, Upload, ChevronRight, ChevronDown, ChevronUp, Eye, Printer, TrendingUp, Package, DollarSign, BarChart3 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, Plus, Edit, Trash2, Image as ImageIcon, X, Save, Upload, ChevronRight, ChevronDown, ChevronUp, Eye, Printer, TrendingUp, Package, DollarSign, BarChart3, ScanBarcode } from 'lucide-react';
+import { Loader } from '../components/Loader';
+import { Html5Qrcode } from 'html5-qrcode';
 // Types
 
-import { useAppSelector, useDataPolling } from '../store/hooks';
+import { useAppSelector, useDataPolling, useAppDispatch } from '../store/hooks';
+import { ImageInput } from '../components/ImageInput';
 import { fetchProducts, InventoryProduct } from '../store/slices/inventorySlice';
 import { fetchSuppliers } from '../store/slices/suppliersSlice';
 import { fetchSales } from '../store/slices/salesSlice';
 import { IProduct, IVariant, ISale } from '../types/models';
 import { createProduct, updateProduct } from '../models/product';
 import { createVariant, updateVariant } from '../models/variants';
-import { useAppDispatch } from '../store/hooks';
-import { getLabelLayouts } from '../models/settings';
+import { fetchLabelLayouts } from '../store/slices/settingsSlice';
 import { LabelLayout } from '../types/labelLayout';
 import { generateLabelsPageHTML } from '../utils/labelRenderer';
 
@@ -33,6 +35,9 @@ export function Products() {
   const [selectedProductForVariant, setSelectedProductForVariant] = useState<string>('');
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [isHeaderExpanded, setIsHeaderExpanded] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scanContainerRef = useRef<HTMLDivElement>(null);
 
   // Product Form State
   const [productFormData, setProductFormData] = useState({
@@ -153,8 +158,8 @@ export function Products() {
         price: typeof variant.price === 'number' ? variant.price.toString() : '',
         stock: variant.stock?.toString() || '',
         lowStock: variant.lowStock?.toString() || '',
-        attributes: typeof variant.attributes === 'string' 
-          ? variant.attributes 
+        attributes: typeof variant.attributes === 'string'
+          ? variant.attributes
           : JSON.stringify(variant.attributes || {})
       });
     } else {
@@ -249,7 +254,124 @@ export function Products() {
     }
     return Object.entries(attributes).map(([key, value]) => `${key}: ${value}`).join(', ');
   };
+
+  // Barcode Scanner Logic for Products Page
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        await scannerRef.current.clear();
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+      }
+      scannerRef.current = null;
+    }
+    setIsScanning(false);
+  }, []);
+
+  const handleBarcodeScanned = useCallback((barcode: string) => {
+    // Set search to barcode to filter products
+    setSearch(barcode);
+    // Stop scanner after successful scan
+    stopScanner();
+
+    // Find and highlight the product if found
+    const product = products.find(p => p.barcode === barcode);
+    if (product) {
+      // Expand the product if it's in the list
+      setExpandedProducts(prev => new Set(prev).add(product.id));
+      // Scroll to product after a brief delay
+      setTimeout(() => {
+        const element = document.getElementById(`product-${product.id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-accent-blue');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-accent-blue');
+          }, 2000);
+        }
+      }, 100);
+    } else {
+      alert(`Product with barcode "${barcode}" not found.`);
+    }
+  }, [products, stopScanner]);
+
+  const startScanner = useCallback(async () => {
+    if (!scanContainerRef.current) return;
+
+    try {
+      const html5QrCode = new Html5Qrcode("product-barcode-scanner");
+      scannerRef.current = html5QrCode;
+
+      await html5QrCode.start(
+        { facingMode: "environment" }, // Use back camera
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          // Success callback - barcode/QR detected
+          handleBarcodeScanned(decodedText);
+        },
+        (errorMessage) => {
+          // Error callback - ignore, scanner will keep trying
+        }
+      );
+      setIsScanning(true);
+    } catch (err) {
+      console.error('Error starting scanner:', err);
+      alert('Failed to start camera. Please ensure camera permissions are granted.');
+    }
+  }, [handleBarcodeScanned]);
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        stopScanner();
+      }
+    };
+  }, [stopScanner]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isScanning) {
+        stopScanner();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isScanning, stopScanner]);
+
   return <div className="flex flex-col h-full bg-primary text-text-primary">
+    {/* Barcode Scanner Modal */}
+    {isScanning && (
+      <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div className="bg-secondary border border-border-primary rounded-lg p-6 max-w-md w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-text-primary">Scan Barcode/QR Code</h3>
+            <button
+              onClick={stopScanner}
+              className="text-text-muted hover:text-accent-red transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          <div
+            id="product-barcode-scanner"
+            ref={scanContainerRef}
+            className="w-full rounded-lg overflow-hidden bg-black"
+            style={{ minHeight: '300px' }}
+          />
+          <p className="text-sm text-text-muted mt-4 text-center">
+            Point camera at barcode or QR code. Press ESC to cancel.
+          </p>
+        </div>
+      </div>
+    )}
+
     {/* Header / Toolbar */}
     <div className="border-b border-border-primary bg-secondary">
       <div className="flex items-center justify-between p-4">
@@ -271,8 +393,8 @@ export function Products() {
           </div>
         </div>
         {!isHeaderExpanded && (
-          <button 
-            onClick={() => handleOpenModal()} 
+          <button
+            onClick={() => handleOpenModal()}
             className="bg-accent-blue hover:bg-blue-600 text-white px-4 py-2 rounded-sm flex items-center gap-2 text-sm font-medium transition-colors shadow-lg shadow-blue-900/20"
           >
             <Plus size={16} />
@@ -299,7 +421,20 @@ export function Products() {
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input type="text" placeholder="Search by SKU or Name..." value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-primary border border-border-primary text-text-primary text-sm py-2 pl-9 pr-4 focus:outline-none focus:border-accent-blue placeholder-text-muted rounded-sm" />
+              <input
+                type="text"
+                placeholder="Scan barcode or search by SKU/Name..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full bg-primary border border-border-primary text-text-primary text-sm py-2 pl-9 pr-10 focus:outline-none focus:border-accent-blue placeholder-text-muted rounded-sm"
+              />
+              <button
+                onClick={() => isScanning ? stopScanner() : startScanner()}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 transition-colors ${isScanning ? 'text-accent-red hover:text-red-600' : 'text-text-muted hover:text-accent-blue'}`}
+                title={isScanning ? 'Stop Scanner' : 'Start Barcode Scanner'}
+              >
+                <ScanBarcode size={16} />
+              </button>
             </div>
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0">
               {['All', 'Electronics', 'Furniture', 'Accessories'].map(cat => <button key={cat} onClick={() => setFilter(cat)} className={`px-3 py-2 text-xs font-medium border rounded-sm whitespace-nowrap ${filter === cat ? 'bg-accent-blue/20 border-accent-blue text-accent-blue' : 'bg-primary border-border-primary text-text-muted hover:border-border-secondary'} transition-colors`}>
@@ -313,216 +448,229 @@ export function Products() {
 
     {/* Table Content */}
     <div className="flex-1 overflow-auto p-6">
-      <div className="border border-border-primary bg-secondary rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
-          <thead className="bg-tertiary text-text-muted text-[10px] uppercase font-mono tracking-wider">
-            <tr>
-              <th className="p-3 border-b border-border-primary w-12 text-center"></th>
-              <th className="p-3 border-b border-border-primary w-16 text-center">
-                Img
-              </th>
-              <th className="p-3 border-b border-border-primary hidden md:table-cell">Barcode</th>
-              <th className="p-3 border-b border-border-primary">
-                Product Name
-              </th>
-              <th className="p-3 border-b border-border-primary hidden sm:table-cell">Category</th>
-              <th className="p-3 border-b border-border-primary text-right">
-                Price
-              </th>
-              <th className="p-3 border-b border-border-primary text-right">
-                Stock
-              </th>
-              <th className="p-3 border-b border-border-primary text-center hidden lg:table-cell">
-                Status
-              </th>
-              <th className="p-3 border-b border-border-primary text-right">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-primary">
-            {filteredProducts.map(product => {
-              const isExpanded = expandedProducts.has(product.id);
-              const hasVariants = product.variants && product.variants.length > 0;
-              
-              return (
-                <React.Fragment key={product.id}>
-                  <tr className="hover:bg-tertiary transition-colors group">
-                    <td className="p-3 text-center">
-                      {hasVariants ? (
-                        <button
-                          onClick={() => toggleProductExpansion(product.id)}
-                          className="p-1 hover:bg-primary rounded transition-colors text-text-muted hover:text-accent-blue"
-                          title={isExpanded ? 'Collapse variants' : 'Expand variants'}
-                        >
-                          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                      ) : (
-                        <div className="w-6 h-6"></div>
-                      )}
-                    </td>
-                    <td className="p-3 text-center">
-                      <div className="w-8 h-8 bg-primary border border-border-primary rounded flex items-center justify-center mx-auto text-text-muted">
-                        <ImageIcon size={14} />
-                      </div>
-                    </td>
-                    <td className="p-3 font-mono text-xs text-accent-blue hidden md:table-cell">
-                      {product.barcode || 'N/A'}
-                    </td>
-                    <td className="p-3 text-sm font-medium text-text-primary">
-                      <div className="flex flex-col">
-                        <span>{product.name}</span>
-                        <span className="md:hidden text-xs text-text-muted font-mono mt-1">
-                          {product.barcode || 'N/A'}
-                        </span>
-                      </div>
-                      {hasVariants && (
-                        <span className="ml-2 text-xs text-text-muted font-normal">
-                          ({product.variants.length} variant{product.variants.length !== 1 ? 's' : ''})
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-xs text-text-muted hidden sm:table-cell">
-                      {product.category}
-                    </td>
-                    <td className="p-3 text-right font-mono text-sm">
-                      ${(typeof product.variants[0]?.price === 'number' ? product.variants[0].price : 0).toFixed(2)}
-                    </td>
-                    <td className="p-3 text-right font-mono text-sm">
-                      <span className={`text-text-primary ${(product.totalStock || 0) < (product.minStockLevel || 10) ? 'text-accent-red font-bold' : ''}`}>
-                        {product.totalStock || 0}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center hidden lg:table-cell">
-                      <span className="text-[10px] px-2 py-0.5 rounded border bg-accent-green/10 text-accent-green border-accent-green/20">
-                        ACTIVE
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => setSelectedProductDetail(product)} 
-                          className="p-1 hover:text-accent-blue transition-colors"
-                          title="View Product Details"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button 
-                          onClick={() => handleOpenVariantModal(product.id)} 
-                          className="p-1 hover:text-accent-green transition-colors"
-                          title="Add Variant"
-                        >
-                          <Plus size={14} />
-                        </button>
-                        <button onClick={() => handleOpenModal(product)} className="p-1 hover:text-accent-blue transition-colors" title="Edit Product">
-                          <Edit size={14} />
-                        </button>
-                        <button onClick={() => handleDelete(product.id)} className="p-1 hover:text-accent-red transition-colors" title="Delete Product">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+      {loading ? (
+        <div className="h-full flex items-center justify-center">
+          <Loader message="Loading products..." />
+        </div>
+      ) : (
+        <div className="border border-border-primary bg-secondary rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead className="bg-tertiary text-text-muted text-[10px] uppercase font-mono tracking-wider">
+                <tr>
+                  <th className="p-3 border-b border-border-primary w-12 text-center"></th>
+                  <th className="p-3 border-b border-border-primary w-16 text-center">
+                    Img
+                  </th>
+                  <th className="p-3 border-b border-border-primary hidden md:table-cell">Barcode</th>
+                  <th className="p-3 border-b border-border-primary">
+                    Product Name
+                  </th>
+                  <th className="p-3 border-b border-border-primary hidden sm:table-cell">Category</th>
+                  <th className="p-3 border-b border-border-primary text-right">
+                    Price
+                  </th>
+                  <th className="p-3 border-b border-border-primary text-right">
+                    Stock
+                  </th>
+                  <th className="p-3 border-b border-border-primary text-center hidden lg:table-cell">
+                    Status
+                  </th>
+                  <th className="p-3 border-b border-border-primary text-right">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-primary">
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-text-muted">
+                      No products found
                     </td>
                   </tr>
-                  
-                  {/* Expanded Variants Subtable */}
-                  {isExpanded && hasVariants && (
-                    <tr>
-                      <td colSpan={10} className="p-0 bg-primary/50">
-                        <div className="p-4 pl-6">
-                          <div className="border border-border-primary bg-secondary rounded-lg overflow-hidden">
-                            <div className="bg-tertiary px-4 py-2 border-b border-border-primary">
-                              <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">
-                                Variants ({product.variants.length})
-                              </h4>
+                ) : (
+                  filteredProducts.map(product => {
+                    const isExpanded = expandedProducts.has(product.id);
+                    const hasVariants = product.variants && product.variants.length > 0;
+
+                    return (
+                      <React.Fragment key={product.id}>
+                        <tr id={`product-${product.id}`} className="hover:bg-tertiary transition-colors group">
+                          <td className="p-3 text-center">
+                            {hasVariants ? (
+                              <button
+                                onClick={() => toggleProductExpansion(product.id)}
+                                className="p-1 hover:bg-primary rounded transition-colors text-text-muted hover:text-accent-blue"
+                                title={isExpanded ? 'Collapse variants' : 'Expand variants'}
+                              >
+                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              </button>
+                            ) : (
+                              <div className="w-6 h-6"></div>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="w-8 h-8 bg-primary border border-border-primary rounded flex items-center justify-center mx-auto text-text-muted">
+                              <ImageIcon size={14} />
                             </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-left border-collapse min-w-[600px]">
-                              <thead className="bg-primary text-text-muted text-[10px] uppercase font-mono tracking-wider">
-                                <tr>
-                                  <th className="p-2 border-b border-border-primary">SKU</th>
-                                  <th className="p-2 border-b border-border-primary">Attributes</th>
-                                  <th className="p-2 border-b border-border-primary text-right">Cost</th>
-                                  <th className="p-2 border-b border-border-primary text-right">Price</th>
-                                  <th className="p-2 border-b border-border-primary text-right">Stock</th>
-                                  <th className="p-2 border-b border-border-primary text-right">Margin</th>
-                                  <th className="p-2 border-b border-border-primary text-center">
-                                    <button
-                                      onClick={() => handleOpenVariantModal(product.id)}
-                                      className="p-1 hover:bg-primary rounded transition-colors text-text-muted hover:text-accent-blue"
-                                      title="Add variant"
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border-primary">
-                                {product.variants.map((variant) => {
-                                  const cost = typeof variant.cost === 'number' ? variant.cost : 0;
-                                  const price = typeof variant.price === 'number' ? variant.price : 0;
-                                  const margin = price - cost;
-                                  const marginPercent = price > 0 ? ((margin / price) * 100).toFixed(1) : '0';
-                                  
-                                  return (
-                                    <tr key={variant.id} className="hover:bg-tertiary transition-colors group/variant">
-                                      <td className="p-2 font-mono text-xs text-accent-blue">
-                                        {variant.sku || 'N/A'}
-                                      </td>
-                                      <td className="p-2 text-xs text-text-muted">
-                                        {variant.attributes && Object.keys(variant.attributes).length > 0
-                                          ? formatAttributes(variant.attributes)
-                                          : <span className="text-text-muted italic">No attributes</span>
-                                        }
-                                      </td>
-                                      <td className="p-2 text-right font-mono text-xs text-text-primary">
-                                        ${cost.toFixed(2)}
-                                      </td>
-                                      <td className="p-2 text-right font-mono text-xs text-text-primary font-semibold">
-                                        ${price.toFixed(2)}
-                                      </td>
-                                      <td className="p-2 text-right font-mono text-xs">
-                                        <span className={`${(variant.stock || 0) < (variant.lowStock || 0) ? 'text-accent-red font-bold' : 'text-text-primary'}`}>
-                                          {variant.stock || 0}
-                                        </span>
-                                      </td>
-                                      <td className="p-2 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                          <span className="font-mono text-xs">
-                                            <span className={`${margin >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-                                              ${margin.toFixed(2)} ({marginPercent}%)
-                                            </span>
-                                          </span>
-                                          <div className="opacity-0 group-hover/variant:opacity-100 transition-opacity">
-                                            <button 
-                                              onClick={() => handleOpenVariantModal(product.id, variant)} 
-                                              className="p-1 hover:text-accent-blue transition-colors"
-                                              title="Edit variant"
+                          </td>
+                          <td className="p-3 font-mono text-xs text-accent-blue hidden md:table-cell">
+                            {product.barcode || 'N/A'}
+                          </td>
+                          <td className="p-3 text-sm font-medium text-text-primary">
+                            <div className="flex flex-col">
+                              <span>{product.name}</span>
+                              <span className="md:hidden text-xs text-text-muted font-mono mt-1">
+                                {product.barcode || 'N/A'}
+                              </span>
+                            </div>
+                            {hasVariants && (
+                              <span className="ml-2 text-xs text-text-muted font-normal">
+                                ({product.variants.length} variant{product.variants.length !== 1 ? 's' : ''})
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-xs text-text-muted hidden sm:table-cell">
+                            {product.category}
+                          </td>
+                          <td className="p-3 text-right font-mono text-sm">
+                            ${(typeof product.variants[0]?.price === 'number' ? product.variants[0].price : 0).toFixed(2)}
+                          </td>
+                          <td className="p-3 text-right font-mono text-sm">
+                            <span className={`text-text-primary ${(product.totalStock || 0) < (product.minStockLevel || 10) ? 'text-accent-red font-bold' : ''}`}>
+                              {product.totalStock || 0}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center hidden lg:table-cell">
+                            <span className="text-[10px] px-2 py-0.5 rounded border bg-accent-green/10 text-accent-green border-accent-green/20">
+                              ACTIVE
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => setSelectedProductDetail(product)}
+                                className="p-1 hover:text-accent-blue transition-colors"
+                                title="View Product Details"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleOpenVariantModal(product.id)}
+                                className="p-1 hover:text-accent-green transition-colors"
+                                title="Add Variant"
+                              >
+                                <Plus size={14} />
+                              </button>
+                              <button onClick={() => handleOpenModal(product)} className="p-1 hover:text-accent-blue transition-colors" title="Edit Product">
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={() => handleDelete(product.id)} className="p-1 hover:text-accent-red transition-colors" title="Delete Product">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Expanded Variants Subtable */}
+                        {isExpanded && hasVariants && (
+                          <tr>
+                            <td colSpan={10} className="p-0 bg-primary/50">
+                              <div className="p-4 pl-6">
+                                <div className="border border-border-primary bg-secondary rounded-lg overflow-hidden">
+                                  <div className="bg-tertiary px-4 py-2 border-b border-border-primary">
+                                    <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                      Variants ({product.variants.length})
+                                    </h4>
+                                  </div>
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[600px]">
+                                      <thead className="bg-primary text-text-muted text-[10px] uppercase font-mono tracking-wider">
+                                        <tr>
+                                          <th className="p-2 border-b border-border-primary">SKU</th>
+                                          <th className="p-2 border-b border-border-primary">Attributes</th>
+                                          <th className="p-2 border-b border-border-primary text-right">Cost</th>
+                                          <th className="p-2 border-b border-border-primary text-right">Price</th>
+                                          <th className="p-2 border-b border-border-primary text-right">Stock</th>
+                                          <th className="p-2 border-b border-border-primary text-right">Margin</th>
+                                          <th className="p-2 border-b border-border-primary text-center">
+                                            <button
+                                              onClick={() => handleOpenVariantModal(product.id)}
+                                              className="p-1 hover:bg-primary rounded transition-colors text-text-muted hover:text-accent-blue"
+                                              title="Add variant"
                                             >
-                                              <Edit size={12} />
+                                              <Plus size={14} />
                                             </button>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      <td className="p-2"></td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-border-primary">
+                                        {product.variants.map((variant) => {
+                                          const cost = typeof variant.cost === 'number' ? variant.cost : 0;
+                                          const price = typeof variant.price === 'number' ? variant.price : 0;
+                                          const margin = price - cost;
+                                          const marginPercent = price > 0 ? ((margin / price) * 100).toFixed(1) : '0';
+
+                                          return (
+                                            <tr key={variant.id} className="hover:bg-tertiary transition-colors group/variant">
+                                              <td className="p-2 font-mono text-xs text-accent-blue">
+                                                {variant.sku || 'N/A'}
+                                              </td>
+                                              <td className="p-2 text-xs text-text-muted">
+                                                {variant.attributes && Object.keys(variant.attributes).length > 0
+                                                  ? formatAttributes(variant.attributes)
+                                                  : <span className="text-text-muted italic">No attributes</span>
+                                                }
+                                              </td>
+                                              <td className="p-2 text-right font-mono text-xs text-text-primary">
+                                                ${cost.toFixed(2)}
+                                              </td>
+                                              <td className="p-2 text-right font-mono text-xs text-text-primary font-semibold">
+                                                ${price.toFixed(2)}
+                                              </td>
+                                              <td className="p-2 text-right font-mono text-xs">
+                                                <span className={`${(variant.stock || 0) < (variant.lowStock || 0) ? 'text-accent-red font-bold' : 'text-text-primary'}`}>
+                                                  {variant.stock || 0}
+                                                </span>
+                                              </td>
+                                              <td className="p-2 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                  <span className="font-mono text-xs">
+                                                    <span className={`${margin >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                                                      ${margin.toFixed(2)} ({marginPercent}%)
+                                                    </span>
+                                                  </span>
+                                                  <div className="opacity-0 group-hover/variant:opacity-100 transition-opacity">
+                                                    <button
+                                                      onClick={() => handleOpenVariantModal(product.id, variant)}
+                                                      className="p-1 hover:text-accent-blue transition-colors"
+                                                      title="Edit variant"
+                                                    >
+                                                      <Edit size={12} />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </td>
+                                              <td className="p-2"></td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  }))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
 
     {/* Modal */}
@@ -679,16 +827,22 @@ export function Products() {
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs text-text-muted uppercase font-bold tracking-wider">
-              Image URL
-            </label>
-            <input
-              type="url"
-              value={productFormData.imageUrl}
-              onChange={e => setProductFormData({ ...productFormData, imageUrl: e.target.value })}
-              className="w-full bg-primary border border-border-primary p-2 text-sm text-text-primary focus:border-accent-blue focus:outline-none rounded-sm"
-              placeholder="https://example.com/image.jpg"
+          <div className="col-span-1 md:col-span-2">
+            <ImageInput
+              value={productFormData.imageUrl && productFormData.imageUrl.startsWith('data:') ? productFormData.imageUrl : null}
+              onChange={(imageData) => {
+                // Store base64 image data
+                setProductFormData({ ...productFormData, imageUrl: imageData || '' });
+              }}
+              label="Product Image"
+              description="Upload a product image or enter an image URL"
+              showPreview={true}
+              previewSize="lg"
+              allowUrlInput={true}
+              urlValue={productFormData.imageUrl && !productFormData.imageUrl.startsWith('data:') ? productFormData.imageUrl : ''}
+              onUrlChange={(url) => {
+                setProductFormData({ ...productFormData, imageUrl: url });
+              }}
             />
           </div>
 
@@ -873,55 +1027,54 @@ export function Products() {
 }
 
 // Product Detail View Component
-function ProductDetailView({ 
-  product, 
+function ProductDetailView({
+  product,
   sales,
-  onClose 
-}: { 
-  product: InventoryProduct; 
+  onClose
+}: {
+  product: InventoryProduct;
   sales: ISale[];
   onClose: () => void;
 }) {
+  const dispatch = useAppDispatch();
   const [selectedVariants, setSelectedVariants] = useState<Set<string>>(new Set());
-  const [labelLayouts, setLabelLayouts] = useState<LabelLayout[]>([]);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+
+  // Get label layouts from Redux store
+  const labelLayouts = useAppSelector(state => state.settings.labelLayouts);
 
   // Calculate analytics
-  const productSales = sales.filter(s => 
+  const productSales = sales.filter(s =>
     product.variants.some(v => v.id === s.variantId)
   );
-  
+
   const totalSales = productSales.reduce((sum, s) => sum + (s.total || 0), 0);
   const totalQuantitySold = productSales.reduce((sum, s) => sum + (s.quantity || 0), 0);
-  const averagePrice = productSales.length > 0 
-    ? totalSales / totalQuantitySold 
+  const averagePrice = productSales.length > 0
+    ? totalSales / totalQuantitySold
     : product.variants[0]?.price || 0;
-  
+
   const totalStock = product.totalStock || 0;
   const totalValue = totalStock * (product.variants[0]?.price || 0);
-  
-  useEffect(() => {
-    loadLabelLayouts();
-  }, []);
 
-  // Reload layouts when modal opens
+  // Fetch label layouts when component mounts
   useEffect(() => {
-    if (product) {
-      loadLabelLayouts();
-    }
-  }, [product]);
+    console.log('ProductDetailView: Fetching label layouts...');
+    dispatch(fetchLabelLayouts());
+  }, [dispatch]);
 
-  const loadLabelLayouts = async () => {
-    try {
-      const layouts = await getLabelLayouts();
-      setLabelLayouts(layouts);
-      if (layouts.length > 0 && !selectedLayoutId) {
-        setSelectedLayoutId(layouts[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading label layouts:', error);
+  // Set default layout when layouts are loaded
+  useEffect(() => {
+    console.log('ProductDetailView: labelLayouts changed:', {
+      count: labelLayouts.length,
+      layouts: labelLayouts.map(l => ({ id: l.id, name: l.name }))
+    });
+    if (labelLayouts.length > 0 && !selectedLayoutId) {
+      console.log('ProductDetailView: Setting default layout:', labelLayouts[0].id);
+      setSelectedLayoutId(labelLayouts[0].id);
     }
-  };
+  }, [labelLayouts, selectedLayoutId]);
 
   const formatAttributes = (attributes: Record<string, string> | string): string => {
     if (typeof attributes === 'string') {
@@ -973,12 +1126,12 @@ function ProductDetailView({
     }
 
     const selectedVariantList = product.variants.filter(v => selectedVariants.has(v.id));
-    
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) return alert("Please allow popups to print label");
-    
-    const html = generateLabelsPageHTML(selectedLayout, selectedVariantList, product, formatAttributes);
-    
+
+    const html = generateLabelsPageHTML(selectedLayout, selectedVariantList, product, formatAttributes, backgroundImage || undefined);
+
     printWindow.document.write(html);
     printWindow.document.close();
   };
@@ -997,8 +1150,8 @@ function ProductDetailView({
               <p className="text-sm text-text-muted font-mono">SKU: {product.sku || product.id}</p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="text-text-muted hover:text-text-primary transition-colors p-2 hover:bg-primary rounded"
           >
             <X size={24} />
@@ -1014,7 +1167,7 @@ function ProductDetailView({
                 <BarChart3 size={20} className="text-accent-blue" />
                 Analytics
               </h3>
-              
+
               <div className="bg-primary border border-border-primary rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-text-muted">Total Stock</span>
@@ -1090,6 +1243,17 @@ function ProductDetailView({
                       )}
                     </select>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <ImageInput
+                      value={backgroundImage}
+                      onChange={setBackgroundImage}
+                      label="Background Image (Optional)"
+                      showPreview={true}
+                      previewSize="sm"
+                      compact={true}
+                      className="mb-0"
+                    />
+                  </div>
                   {labelLayouts.length === 0 && (
                     <span className="text-xs text-text-muted italic">
                       Create layouts in Settings
@@ -1108,7 +1272,7 @@ function ProductDetailView({
                   </button>
                 </div>
               </div>
-              
+
               <div className="border border-border-primary bg-primary rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
@@ -1134,7 +1298,7 @@ function ProductDetailView({
                       {product.variants.map((variant) => {
                         const cost = typeof variant.cost === 'number' ? variant.cost : 0;
                         const price = typeof variant.price === 'number' ? variant.price : 0;
-                        
+
                         return (
                           <tr key={variant.id} className="hover:bg-tertiary transition-colors">
                             <td className="p-3 text-center">

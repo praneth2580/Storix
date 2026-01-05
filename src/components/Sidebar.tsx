@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   Search,
   User,
+  FileSearch,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -64,6 +65,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
     {
       title: 'System',
       items: [
+        { id: 'logs', icon: FileSearch, label: 'System Logs' },
         { id: 'settings', icon: Settings, label: 'Settings' },
       ]
     }

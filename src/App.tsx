@@ -9,6 +9,23 @@ import {
   setSidebarOpen,
   toggleSidebar,
 } from './store/slices/uiSlice'
+
+// Valid tabs for routing
+const VALID_TABS = [
+  'dashboard',
+  'pos',
+  'stock',
+  'products',
+  'sales',
+  'purchases',
+  'suppliers',
+  'customers',
+  'reports',
+  'logs',
+  'settings',
+] as const;
+
+type ValidTab = typeof VALID_TABS[number];
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
 import { InventoryTable } from './pages/InventoryTable'
@@ -21,15 +38,38 @@ import { Customers } from './pages/Customers'
 import { Settings } from './pages/Settings'
 import { POS } from './pages/POS'
 import { Reports } from './pages/Reports'
+import { Logs } from './pages/Logs'
 import { Menu } from 'lucide-react'
+import { SnackbarContainer } from './components/Snackbar'
+import { useAppSelector, useAppDispatch } from './store/hooks'
+import { removeSnackbar } from './store/slices/snackbarSlice'
 
 export function App() {
   const dispatch = useDispatch()
+  const appDispatch = useAppDispatch()
   const { isAuthenticated, activeTab, theme, isSidebarOpen } = useSelector(
     (state: RootState) => state.ui
   )
+  const snackbarMessages = useAppSelector(state => state.snackbar.messages)
 
-  // Initialize theme
+  // Function to update URL without page reload
+  const updateURL = (tab: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', tab);
+    window.history.pushState({ page: tab }, '', url.toString());
+  }
+
+  // Function to get tab from URL
+  const getTabFromURL = (): ValidTab => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabFromUrl = urlParams.get('page') as ValidTab | null;
+    if (tabFromUrl && VALID_TABS.includes(tabFromUrl)) {
+      return tabFromUrl;
+    }
+    return 'dashboard';
+  }
+
+  // Initialize theme and restore from URL
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
     const script_id = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') as string | null;
@@ -41,7 +81,37 @@ export function App() {
     }
 
     if (script_id) dispatch(setAuthenticated(true))
+
+    // Restore activeTab from URL query parameter
+    const tabFromUrl = getTabFromURL();
+    dispatch(setActiveTab(tabFromUrl));
+    if (!window.location.search.includes('page=')) {
+      updateURL(tabFromUrl);
+    }
   }, [dispatch])
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const tabFromUrl = getTabFromURL();
+      dispatch(setActiveTab(tabFromUrl));
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [dispatch])
+
+  // Update URL when activeTab changes (but avoid infinite loop)
+  useEffect(() => {
+    if (isAuthenticated && activeTab) {
+      const currentTabFromUrl = getTabFromURL();
+      if (currentTabFromUrl !== activeTab) {
+        updateURL(activeTab);
+      }
+    }
+  }, [activeTab, isAuthenticated])
 
   // Apply theme class
   useEffect(() => {
@@ -91,6 +161,7 @@ export function App() {
           onTabChange={(tab) => {
             dispatch(setActiveTab(tab))
             dispatch(setSidebarOpen(false))
+            updateURL(tab)
           }}
           onLogout={() => dispatch(setAuthenticated(false))}
         />
@@ -118,6 +189,7 @@ export function App() {
         {activeTab === 'suppliers' && <Suppliers />}
         {activeTab === 'customers' && <Customers />}
         {activeTab === 'reports' && <Reports />}
+        {activeTab === 'logs' && <Logs />}
         {activeTab === 'settings' && (
           <Settings theme={theme} onToggleTheme={handleToggleTheme} />
         )}
@@ -133,6 +205,7 @@ export function App() {
           'suppliers',
           'customers',
           'reports',
+          'logs',
           'settings',
         ].includes(activeTab) && (
             <div className="flex items-center justify-center h-full text-text-muted flex-col gap-4">
@@ -144,6 +217,12 @@ export function App() {
             </div>
           )}
       </main>
+
+      {/* Snackbar Container */}
+      <SnackbarContainer
+        messages={snackbarMessages}
+        onClose={(id) => appDispatch(removeSnackbar(id))}
+      />
     </div>
   )
 }

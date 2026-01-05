@@ -4,13 +4,16 @@ import { TrendingUp, AlertCircle, DollarSign, Package } from 'lucide-react';
 import { useAppSelector, useDataPolling } from '../store/hooks';
 import { fetchProducts } from '../store/slices/inventorySlice';
 import { fetchSales } from '../store/slices/salesSlice';
+import { Loader } from '../components/Loader';
 
 export function Dashboard() {
-  useDataPolling(fetchProducts, 30000);
-  useDataPolling(fetchSales, 30000);
+  useDataPolling(fetchProducts, 30000, 'Products');
+  useDataPolling(fetchSales, 30000, 'Sales');
 
-  const { items: products } = useAppSelector(state => state.inventory);
-  const { items: sales } = useAppSelector(state => state.sales);
+  const { items: products, loading: productsLoading } = useAppSelector(state => state.inventory);
+  const { items: sales, loading: salesLoading } = useAppSelector(state => state.sales);
+  
+  const isLoading = productsLoading || salesLoading;
 
   // Calculate Metrics
   const totalInventoryValue = products.reduce((sum, p) => sum + (p.defaultSellingPrice * 0), 0); // Stock is not available in IProduct yet.
@@ -23,6 +26,15 @@ export function Dashboard() {
   const chartData2 = [20, 25, 30, 28, 35, 40, 45, 42, 50, 55, 60, 65];
   const chartData3 = [85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30];
   const chartData4 = [45, 50, 45, 55, 48, 52, 58, 50, 60, 65, 62, 70];
+  
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader message="Loading dashboard data..." />
+      </div>
+    );
+  }
+  
   return <div className="p-6 h-full overflow-y-auto bg-primary text-text-primary">
     <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
       <div>

@@ -42,6 +42,7 @@ export function Settings({
     cols: 2,
   });
   const [localStoreSettings, setLocalStoreSettings] = useState(storeSettings);
+  const [googleScriptId, setGoogleScriptId] = useState(() => localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') || '');
 
   useEffect(() => {
     dispatch(fetchStoreSettings());
@@ -64,36 +65,77 @@ export function Settings({
   };
 
   const handleSaveLayout = async (layout: LabelLayout) => {
-    console.log('handleSaveLayout', layout);
+    console.log('handleSaveLayout - received layout:', {
+      id: layout.id,
+      name: layout.name,
+      elementsCount: layout.elements?.length || 0,
+      elements: layout.elements,
+      fullLayout: JSON.stringify(layout, null, 2)
+    });
+    
     try {
-      // const updatedLayouts = editingLayout
-      //   ? labelLayouts.map(l => l.id === layout.id ? layout : l)
-      //   : [...labelLayouts, layout];
-      // console.log('updatedLayouts', updatedLayouts);
+      // Ensure elements array exists and is properly structured
+      // Remove backgroundImage - it won't be saved to backend, will be requested during generation
+      const { backgroundImage, ...layoutWithoutImage } = layout;
+      const layoutToSave: LabelLayout = {
+        ...layoutWithoutImage,
+        elements: Array.isArray(layout.elements) ? layout.elements : [],
+      };
       
-      // console.log('Saving layout:', {
-      //   isEditing: !!editingLayout,
-      //   layoutId: layout.id,
-      //   layoutName: layout.name,
-      //   totalLayouts: updatedLayouts.length,
-      //   allLayoutIds: updatedLayouts.map(l => l.id)
-      // });
+      console.log('Layout to save (after ensuring elements):', {
+        id: layoutToSave.id,
+        name: layoutToSave.name,
+        elementsCount: layoutToSave.elements.length,
+        elements: layoutToSave.elements
+      });
+      
+      // Create a new array (immutable update) - don't mutate labelLayouts directly
+      const existingIndex = labelLayouts.findIndex(l => l.id === layoutToSave.id);
+      const updatedLayouts = existingIndex >= 0
+        ? labelLayouts.map((l, idx) => idx === existingIndex ? layoutToSave : l)
+        : [...labelLayouts, layoutToSave];
+      
+      console.log('Saving layout:', {
+        isEditing: existingIndex >= 0,
+        layoutId: layoutToSave.id,
+        layoutName: layoutToSave.name,
+        elementsCount: layoutToSave.elements.length,
+        totalLayouts: updatedLayouts.length,
+        allLayoutIds: updatedLayouts.map(l => l.id),
+        savedLayoutElements: updatedLayouts.find(l => l.id === layoutToSave.id)?.elements?.length || 0
+      });
 
-      const updatedLayouts = labelLayouts.values;
-      if (updatedLayouts.find(l => l.id === layout.id)) {
-        updatedLayouts[updatedLayouts.findIndex(l => l.id === layout.id)] = layout;
-      } else {
-        updatedLayouts.push(layout);
+      // Verify the layout in updatedLayouts has all elements
+      const savedLayout = updatedLayouts.find(l => l.id === layoutToSave.id);
+      if (savedLayout) {
+        console.log('Layout in updatedLayouts array:', {
+          id: savedLayout.id,
+          name: savedLayout.name,
+          elementsCount: savedLayout.elements?.length || 0,
+          elements: savedLayout.elements
+        });
       }
 
       // Save to backend - this will update Redux state via the fulfilled action
       const result = await dispatch(saveLabelLayoutsThunk(updatedLayouts)).unwrap();
-      console.log('Save result (should match updatedLayouts):', {
+      
+      console.log('Save result:', {
         savedCount: result.length,
         savedIds: result.map(l => l.id),
         expectedCount: updatedLayouts.length,
         expectedIds: updatedLayouts.map(l => l.id)
       });
+      
+      // Verify elements are preserved in the result
+      const resultLayout = result.find(l => l.id === layoutToSave.id);
+      if (resultLayout) {
+        console.log('Layout in save result:', {
+          id: resultLayout.id,
+          name: resultLayout.name,
+          elementsCount: resultLayout.elements?.length || 0,
+          elements: resultLayout.elements
+        });
+      }
       
       setEditingLayout(null);
       
@@ -406,30 +448,86 @@ export function Settings({
             Integrations
           </h2>
 
-          <div className="bg-primary border border-border-primary p-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-accent-green/20 rounded flex items-center justify-center text-accent-green">
-                <Database size={20} />
+          <div className="space-y-4">
+            <div className="bg-primary border border-border-primary p-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-sm">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-accent-green/20 rounded flex items-center justify-center text-accent-green">
+                  <Database size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold">Google Sheets Database</h3>
+                  <p className="text-xs text-text-muted">
+                    {googleScriptId ? `Script ID: ${googleScriptId.substring(0, 20)}...` : 'Not configured'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold">Google Sheets Database</h3>
+              <div className="flex items-center gap-4">
+                <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded border ${
+                  googleScriptId 
+                    ? 'text-accent-green bg-accent-green/10 border-accent-green/10' 
+                    : 'text-text-muted bg-primary border-border-primary'
+                }`}>
+                  <CheckCircle2 size={12} /> {googleScriptId ? 'Connected' : 'Not Connected'}
+                </span>
+                <button className="p-2 hover:bg-tertiary rounded text-text-muted hover:text-text-primary transition-colors" title="Sync Now">
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-primary border border-border-primary p-4 rounded-sm space-y-3">
+              <div className="space-y-2">
+                <label className="text-xs text-text-muted uppercase font-bold tracking-wider flex items-center gap-2">
+                  <Globe size={14} />
+                  Google Apps Script ID
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={googleScriptId}
+                    onChange={(e) => setGoogleScriptId(e.target.value)}
+                    placeholder="AKfycbx..."
+                    className="w-full bg-secondary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none font-mono pr-10"
+                  />
+                  {googleScriptId && (
+                    <button
+                      onClick={() => setGoogleScriptId('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-red transition-colors"
+                      title="Clear"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
                 <p className="text-xs text-text-muted">
-                  Connected to 'Inventory_Master_v2'
+                  Your Google Apps Script deployment ID. This connects Storix to your Google Sheets database.
+                  <br />
+                  <span className="text-accent-blue">Note:</span> Changing this will require a page reload to take effect.
                 </p>
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 text-xs text-accent-green bg-accent-green/10 px-2 py-1 rounded border border-accent-green/10">
-                <CheckCircle2 size={12} /> Connected
-              </span>
-              <button className="p-2 hover:bg-tertiary rounded text-text-muted hover:text-text-primary transition-colors" title="Sync Now">
-                <RefreshCw size={16} />
-              </button>
-            </div>
-          </div>
 
-          <div className="mt-4 text-xs text-text-muted font-mono">
-            Last sync: {new Date().toLocaleString()}
+              <div className="flex justify-end gap-2 pt-2 border-t border-border-primary">
+                <button
+                  onClick={() => {
+                    if (googleScriptId.trim()) {
+                      localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', googleScriptId.trim());
+                      alert('Google Script ID updated! The page will reload to apply changes.');
+                      window.location.reload();
+                    } else {
+                      alert('Please enter a valid Google Script ID.');
+                    }
+                  }}
+                  className="bg-accent-blue hover:bg-blue-600 text-white px-4 py-2 rounded-sm flex items-center gap-2 text-sm font-medium transition-colors"
+                >
+                  <Save size={16} />
+                  Save Script ID
+                </button>
+              </div>
+            </div>
+
+            <div className="text-xs text-text-muted font-mono">
+              Last sync: {new Date().toLocaleString()}
+            </div>
           </div>
         </section>
 

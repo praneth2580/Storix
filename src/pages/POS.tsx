@@ -4,7 +4,9 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { useAppSelector, useAppDispatch, useDataPolling } from '../store/hooks';
 import { fetchProducts } from '../store/slices/inventorySlice';
 import { fetchStoreSettings } from '../store/slices/settingsSlice';
+import { addLog } from '../store/slices/logSlice';
 import { IProduct } from '../types/models';
+import { Loader } from '../components/Loader';
 
 type CartItem = IProduct & {
   quantity: number;
@@ -12,7 +14,7 @@ type CartItem = IProduct & {
 export function POS() {
   // Redux
   const dispatch = useAppDispatch();
-  useDataPolling(fetchProducts, 60000); // 1 min poll for POS
+  useDataPolling(fetchProducts, 60000, 'Products'); // 1 min poll for POS
   const { items: products, loading } = useAppSelector(state => state.inventory);
   
   // Settings from Redux
@@ -32,7 +34,23 @@ export function POS() {
 
   // Fetch settings on component mount
   useEffect(() => {
-    dispatch(fetchStoreSettings());
+    dispatch(fetchStoreSettings())
+      .then((result: any) => {
+        if (result?.type?.includes('fulfilled')) {
+          dispatch(addLog({
+            level: 'success',
+            message: 'Store settings loaded',
+            source: 'Settings',
+          }));
+        }
+      })
+      .catch(() => {
+        dispatch(addLog({
+          level: 'error',
+          message: 'Failed to load store settings',
+          source: 'Settings',
+        }));
+      });
   }, [dispatch]);
 
   // Filter products
@@ -578,7 +596,7 @@ export function POS() {
       </div>
     </div>;
   }
-  return <div className="flex flex-col lg:flex-row h-full bg-primary text-text-primary overflow-hidden">
+  return <div className="flex flex-col lg:flex-row h-full bg-primary text-text-primary overflow-hidden relative">
     {/* UPI QR Code Modal */}
     {showUPIQr && (
       <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
@@ -692,105 +710,168 @@ export function POS() {
     )}
     
     {/* Left Side: Product Catalog */}
-    <div className="flex-1 flex flex-col border-r border-border-primary overflow-hidden">
+    <div className="flex-1 flex flex-col border-r border-border-primary overflow-hidden pb-0 lg:pb-0">
       {/* Search & Filter Bar */}
-      <div className="p-4 bg-secondary border-b border-border-primary flex flex-col sm:flex-row gap-4 shrink-0">
+      <div className="p-3 sm:p-4 bg-secondary border-b border-border-primary flex flex-col sm:flex-row gap-3 sm:gap-4 shrink-0">
         <div className="relative flex-1">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input type="text" placeholder="Scan barcode or search product..." value={search} onChange={e => setSearch(e.target.value)} autoFocus className="w-full bg-primary border border-border-primary text-text-primary py-3 pl-10 pr-12 focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue placeholder-text-muted rounded-sm" />
+          <input 
+            type="text" 
+            placeholder="Scan barcode or search..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            autoFocus 
+            className="w-full bg-primary border border-border-primary text-text-primary py-2.5 sm:py-3 pl-10 pr-12 text-sm sm:text-base focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue placeholder-text-muted rounded-sm" 
+          />
           <button 
             onClick={() => isScanning ? stopScanner() : startScanner()}
-            className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${isScanning ? 'text-accent-red hover:text-red-600' : 'text-text-muted hover:text-accent-blue'}`}
+            className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors touch-manipulation ${isScanning ? 'text-accent-red hover:text-red-600 bg-accent-red/10' : 'text-text-muted hover:text-accent-blue hover:bg-accent-blue/10'}`}
             title={isScanning ? 'Stop Scanner' : 'Start Barcode Scanner'}
           >
-            <ScanBarcode size={20} />
+            <ScanBarcode size={18} />
           </button>
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-full sm:max-w-[400px]">
-          {['All', 'Electronics', 'Furniture', 'Accessories', 'Peripherals'].map(cat => <button key={cat} onClick={() => setCategory(cat)} className={`px-4 py-2 text-sm font-medium whitespace-nowrap border rounded-sm transition-colors ${category === cat ? 'bg-accent-blue/20 border-accent-blue text-accent-blue' : 'bg-primary border-border-primary text-text-muted hover:border-border-secondary'}`}>
-            {cat}
-          </button>)}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+          {['All', 'Electronics', 'Furniture', 'Accessories', 'Peripherals'].map(cat => (
+            <button 
+              key={cat} 
+              onClick={() => setCategory(cat)} 
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap border rounded-sm transition-colors touch-manipulation ${category === cat ? 'bg-accent-blue/20 border-accent-blue text-accent-blue' : 'bg-primary border-border-primary text-text-muted hover:border-border-secondary active:bg-tertiary'}`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Product Grid */}
-      <div className="flex-1 overflow-y-auto p-4 bg-primary">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredProducts.map(product => <button key={product.id} onClick={() => addToCart(product)} className="bg-secondary border border-border-primary p-4 hover:border-accent-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] transition-all text-left group flex flex-col h-full rounded-lg">
-            <div className="flex justify-between items-start mb-2">
-              <div className={`w-2 h-2 rounded-full bg-accent-blue`}></div>
-              <span className="text-[10px] font-mono text-text-muted">
-                100 in stock
-              </span>
-            </div>
-            <h3 className="font-bold text-sm text-text-primary mb-1 line-clamp-2 flex-1">
-              {product.name}
-            </h3>
-            <div className="flex justify-between items-end mt-2">
-              <span className="font-mono text-lg text-accent-blue">
-                ${product.defaultSellingPrice.toFixed(2)}
-              </span>
-              <div className="w-6 h-6 bg-tertiary rounded flex items-center justify-center text-text-muted group-hover:bg-accent-blue group-hover:text-white transition-colors">
-                <Plus size={14} />
-              </div>
-            </div>
-          </button>)}
-        </div>
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-primary pb-20 lg:pb-4">
+        {loading ? (
+          <div className="h-full flex items-center justify-center">
+            <Loader message="Loading products..." />
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-text-muted opacity-50">
+            <Search size={48} className="mb-4" />
+            <p className="text-sm">No products found</p>
+            <p className="text-xs mt-1">Try a different search term</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {filteredProducts.map(product => (
+              <button 
+                key={product.id} 
+                onClick={() => addToCart(product)} 
+                className="bg-secondary border border-border-primary p-3 sm:p-4 hover:border-accent-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] active:scale-[0.98] transition-all text-left group flex flex-col h-full rounded-lg touch-manipulation"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className={`w-2 h-2 rounded-full bg-accent-blue`}></div>
+                  <span className="text-[10px] font-mono text-text-muted">
+                    100 in stock
+                  </span>
+                </div>
+                <h3 className="font-bold text-xs sm:text-sm text-text-primary mb-1 line-clamp-2 flex-1">
+                  {product.name}
+                </h3>
+                <div className="flex justify-between items-end mt-2">
+                  <span className="font-mono text-base sm:text-lg text-accent-blue">
+                    ${product.defaultSellingPrice.toFixed(2)}
+                  </span>
+                  <div className="w-6 h-6 bg-tertiary rounded flex items-center justify-center text-text-muted group-hover:bg-accent-blue group-hover:text-white transition-colors">
+                    <Plus size={14} />
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
 
-    {/* Right Side: Cart & Checkout */}
-    <div className="w-full lg:w-[400px] flex flex-col bg-secondary border-t lg:border-t-0 lg:border-l border-border-primary shrink-0 h-[40vh] lg:h-full">
+    {/* Right Side: Cart & Checkout - Mobile Bottom Sheet / Desktop Sidebar */}
+    <div className={`
+      fixed bottom-0 left-0 right-0 lg:relative lg:bottom-auto lg:left-auto lg:right-auto
+      w-full lg:w-[400px] 
+      flex flex-col bg-secondary border-t lg:border-t-0 lg:border-l border-border-primary 
+      shrink-0 
+      h-[60vh] lg:h-full
+      transform transition-transform duration-300 ease-out
+      ${cart.length > 0 ? 'translate-y-0' : 'translate-y-[calc(100%-60px)] lg:translate-y-0'}
+      z-40 lg:z-auto
+      shadow-[0_-4px_20px_rgba(0,0,0,0.1)] lg:shadow-none
+    `}>
       {/* Cart Header */}
-      <div className="p-4 border-b border-border-primary flex justify-between items-center bg-tertiary shrink-0">
+      <div className="p-3 sm:p-4 border-b border-border-primary flex justify-between items-center bg-tertiary shrink-0">
+        {/* Mobile drag handle */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-border-primary rounded-full lg:hidden"></div>
         <div className="flex items-center gap-2 text-text-primary font-bold">
           <ShoppingCart size={18} />
-          <span>Current Sale</span>
+          <span className="text-sm sm:text-base">Current Sale</span>
           <span className="bg-accent-blue text-white text-xs px-2 py-0.5 rounded-full">
             {cart.reduce((a, b) => a + b.quantity, 0)}
           </span>
         </div>
-        <button onClick={clearCart} className="text-text-muted hover:text-accent-red text-xs flex items-center gap-1 transition-colors">
-          <Trash2 size={14} /> Clear
-        </button>
+        {cart.length > 0 && (
+          <button 
+            onClick={clearCart} 
+            className="text-text-muted hover:text-accent-red text-xs flex items-center gap-1 transition-colors touch-manipulation p-1.5 rounded hover:bg-accent-red/10"
+          >
+            <Trash2 size={14} /> <span className="hidden sm:inline">Clear</span>
+          </button>
+        )}
       </div>
 
       {/* Cart Items */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-text-muted opacity-50">
-          <ScanBarcode size={48} className="mb-4" />
-          <p>Scan item or select from grid</p>
-        </div> : cart.map(item => <div key={item.id} className="bg-primary border border-border-primary p-3 flex justify-between items-center group rounded-sm">
-          <div className="flex-1">
-            <div className="text-sm font-medium text-text-primary">
-              {item.name}
-            </div>
-            <div className="text-xs font-mono text-text-muted">
-              ${item.defaultSellingPrice.toFixed(2)} / unit
-            </div>
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
+        {cart.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-text-muted opacity-50 px-4">
+            <ScanBarcode size={48} className="mb-4" />
+            <p className="text-sm text-center">Scan item or select from grid</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-secondary border border-border-primary rounded-sm">
-              <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:text-accent-red transition-colors">
-                <Minus size={12} />
-              </button>
-              <span className="w-8 text-center font-mono text-sm">
-                {item.quantity}
-              </span>
-              <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:text-accent-blue transition-colors">
-                <Plus size={12} />
-              </button>
+        ) : (
+          cart.map(item => (
+            <div 
+              key={item.id} 
+              className="bg-primary border border-border-primary p-3 flex justify-between items-center group rounded-sm gap-3"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-text-primary truncate">
+                  {item.name}
+                </div>
+                <div className="text-xs font-mono text-text-muted">
+                  ${item.defaultSellingPrice.toFixed(2)} / unit
+                </div>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <div className="flex items-center bg-secondary border border-border-primary rounded-sm">
+                  <button 
+                    onClick={() => updateQuantity(item.id, -1)} 
+                    className="p-1.5 sm:p-1 hover:text-accent-red active:bg-accent-red/10 transition-colors touch-manipulation"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="w-8 sm:w-8 text-center font-mono text-sm">
+                    {item.quantity}
+                  </span>
+                  <button 
+                    onClick={() => updateQuantity(item.id, 1)} 
+                    className="p-1.5 sm:p-1 hover:text-accent-blue active:bg-accent-blue/10 transition-colors touch-manipulation"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <div className="w-16 sm:w-16 text-right font-mono text-sm font-bold text-text-primary">
+                  ${(item.defaultSellingPrice * item.quantity).toFixed(2)}
+                </div>
+              </div>
             </div>
-            <div className="w-16 text-right font-mono text-sm font-bold text-text-primary">
-              ${(item.defaultSellingPrice * item.quantity).toFixed(0)}
-            </div>
-          </div>
-        </div>)}
+          ))
+        )}
       </div>
 
       {/* Payment Section */}
-      <div className="bg-tertiary border-t border-border-primary p-4 shrink-0">
-        <div className="space-y-2 mb-4">
+      <div className="bg-tertiary border-t border-border-primary p-3 sm:p-4 shrink-0 safe-area-inset-bottom">
+        <div className="space-y-2 mb-3 sm:mb-4">
           <div className="flex justify-between text-sm text-text-muted">
             <span>Subtotal</span>
             <span className="font-mono">${subtotal.toFixed(2)}</span>
@@ -799,7 +880,7 @@ export function POS() {
             <span>Tax (8%)</span>
             <span className="font-mono">${tax.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-xl font-bold text-text-primary pt-2 border-t border-border-primary">
+          <div className="flex justify-between text-lg sm:text-xl font-bold text-text-primary pt-2 border-t border-border-primary">
             <span>Total</span>
             <span className="font-mono text-accent-blue">
               ${total.toFixed(2)}
@@ -807,31 +888,48 @@ export function POS() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <button onClick={() => setPaymentMethod('card')} className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors ${paymentMethod === 'card' ? 'bg-accent-blue/20 border-accent-blue text-accent-blue' : 'bg-secondary border-border-primary text-text-muted'}`}>
-            <CreditCard size={16} /> Card
+        <div className="grid grid-cols-3 gap-2 mb-3 sm:mb-4">
+          <button 
+            onClick={() => setPaymentMethod('card')} 
+            className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors touch-manipulation active:scale-95 ${paymentMethod === 'card' ? 'bg-accent-blue/20 border-accent-blue text-accent-blue' : 'bg-secondary border-border-primary text-text-muted'}`}
+          >
+            <CreditCard size={16} /> <span className="hidden sm:inline">Card</span>
           </button>
-          <button onClick={() => setPaymentMethod('cash')} className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors ${paymentMethod === 'cash' ? 'bg-accent-green/20 border-accent-green text-accent-green' : 'bg-secondary border-border-primary text-text-muted'}`}>
-            <Banknote size={16} /> Cash
+          <button 
+            onClick={() => setPaymentMethod('cash')} 
+            className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors touch-manipulation active:scale-95 ${paymentMethod === 'cash' ? 'bg-accent-green/20 border-accent-green text-accent-green' : 'bg-secondary border-border-primary text-text-muted'}`}
+          >
+            <Banknote size={16} /> <span className="hidden sm:inline">Cash</span>
           </button>
-          <button onClick={handleQRPaymentClick} className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors ${paymentMethod === 'qr' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-secondary border-border-primary text-text-muted'}`}>
-            <QrCode size={16} /> QR
+          <button 
+            onClick={handleQRPaymentClick} 
+            className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors touch-manipulation active:scale-95 ${paymentMethod === 'qr' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-secondary border-border-primary text-text-muted'}`}
+          >
+            <QrCode size={16} /> <span className="hidden sm:inline">QR</span>
           </button>
         </div>
 
         <button 
           onClick={handleDownloadInvoice} 
           disabled={cart.length === 0}
-          className="w-full mb-3 bg-secondary hover:bg-tertiary border border-border-primary text-text-primary py-2.5 font-medium rounded-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full mb-2 sm:mb-3 bg-secondary hover:bg-tertiary border border-border-primary text-text-primary py-2.5 font-medium rounded-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98] text-sm sm:text-base"
         >
-          <Download size={16} /> Download Invoice
+          <Download size={16} /> <span className="hidden sm:inline">Download</span> Invoice
         </button>
-        <button onClick={handleCheckout} disabled={cart.length === 0 || isCheckingOut} className={`w-full py-4 font-bold text-lg flex items-center justify-center gap-2 transition-all rounded-sm ${isCheckingOut ? 'bg-accent-green text-white cursor-wait' : cart.length === 0 ? 'bg-border-primary text-text-muted cursor-not-allowed' : 'bg-accent-blue hover:bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]'}`}>
-          {isCheckingOut ? <>
-            <CheckCircle2 className="animate-pulse" /> Processing...
-          </> : <>
-            Checkout <span className="font-mono">${total.toFixed(2)}</span>
-          </>}
+        <button 
+          onClick={handleCheckout} 
+          disabled={cart.length === 0 || isCheckingOut} 
+          className={`w-full py-3 sm:py-4 font-bold text-base sm:text-lg flex items-center justify-center gap-2 transition-all rounded-sm touch-manipulation active:scale-[0.98] ${isCheckingOut ? 'bg-accent-green text-white cursor-wait' : cart.length === 0 ? 'bg-border-primary text-text-muted cursor-not-allowed' : 'bg-accent-blue hover:bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]'}`}
+        >
+          {isCheckingOut ? (
+            <>
+              <CheckCircle2 className="animate-pulse" /> Processing...
+            </>
+          ) : (
+            <>
+              Checkout <span className="font-mono">${total.toFixed(2)}</span>
+            </>
+          )}
         </button>
       </div>
     </div>

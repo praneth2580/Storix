@@ -9,11 +9,20 @@ type CartItem = {
 };
 import { useAppSelector, useDataPolling } from '../store/hooks';
 import { fetchProducts } from '../store/slices/inventorySlice';
+import { Loader } from '../components/Loader';
 // CartItem is local to this component logic for now, or could match ISaleItem but ISaleItem is for the record.
 // Let's keep a local CartItem type but map fields correctly.
 export function SalesEntry() {
-  useDataPolling(fetchProducts, 60000);
-  const { items: products } = useAppSelector(state => state.inventory);
+  useDataPolling(fetchProducts, 60000, 'Products');
+  const { items: products, loading } = useAppSelector(state => state.inventory);
+  
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader message="Loading products..." />
+      </div>
+    );
+  }
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
