@@ -44,6 +44,7 @@ import { SnackbarContainer } from './components/Snackbar'
 import { NetworkStatus } from './components/NetworkStatus'
 import { useAppSelector, useAppDispatch } from './store/hooks'
 import { removeSnackbar } from './store/slices/snackbarSlice'
+import { getAccounts } from './models/accounts/accounts';
 
 export function App() {
   const dispatch = useDispatch()

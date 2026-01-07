@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+    <script>
+        // Allow multiple origins for development and production
+        const ALLOWED_ORIGINS = [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "https://storix.app", // Add your production domain
+            window.location.origin // Allow current origin
+        ];
+
+        window.addEventListener("message", e => {
+            // Check if origin is allowed
+            if (!ALLOWED_ORIGINS.includes(e.origin)) {
+                console.warn("Rejected message from origin:", e.origin);
+                return;
+            }
+            
+            if (!e.data || e.data.type !== "MUTATE") return;
+
+            google.script.run
+                .withSuccessHandler(res => {
+                    e.source.postMessage(
+                        { ok: true, id: e.data.id, result: res },
+                        e.origin
+                    );
+                })
+                .withFailureHandler(err => {
+                    e.source.postMessage(
+                        { ok: false, id: e.data.id, error: err.message || String(err) },
+                        e.origin
+                    );
+                })
+                .mutateRow(e.data.payload);
+        });
+    </script>
+</body>
+
+</html>

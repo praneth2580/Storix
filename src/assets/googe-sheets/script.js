@@ -9,7 +9,7 @@
 /** CONFIG */
 const SPREADSHEET_ID = "1YWCKAwAkKiMkWI3ZEh2PUMiq9PNmgr5biMR6ECywrek"; // <--- set this
 const META_SHEET = "__Meta__";
-const JSONP_CALLBACK = "storix"; // fixed JSONP callback name
+const DEFAULT_JSONP_CALLBACK = "storix"; // fallback JSONP callback name
 
 /** SCHEMAS - keep header names EXACT in sheets */
 const SCHEMAS = {
@@ -60,63 +60,84 @@ const SCHEMAS = {
    ENTRY POINTS (GET-only)
    ------------------------ */
 function doGet(e) {
-    // All actions handled via GET; always return JSONP: storix(...)
+    // All actions handled via GET; always return JSONP with dynamic callback
     try {
         const action = (e && e.parameter && e.parameter.action) || "unknown";
+        const callbackName = (e && e.parameter && e.parameter.callback) || DEFAULT_JSONP_CALLBACK;
 
         switch (action) {
+            // Test endpoint to verify backend is working
+            case "test":
+                return respondJSONP({ 
+                    status: "ok", 
+                    message: "Backend is working",
+                    callback: callbackName,
+                    timestamp: new Date().toISOString()
+                }, callbackName);
+
             // Reading / sync
             case "syncAll":
-                return respondJSONP(syncAll());
+                return respondJSONP(syncAll(), callbackName);
 
             case "syncChanges":
-                return respondJSONP(syncChanges(e));
+                return respondJSONP(syncChanges(e), callbackName);
 
             case "get":
-                return respondJSONP(handleGet(e));
+                return respondJSONP(handleGet(e), callbackName);
 
             case "getSettings":
-                return respondJSONP(getSettings());
+                return respondJSONP(getSettings(), callbackName);
 
             // Writes (still GET with data param)
             case "create":
-                return respondJSONP(handleCreate(e));
+                return respondJSONP(handleCreate(e), callbackName);
 
             case "update":
-                return respondJSONP(handleUpdate(e));
+                return respondJSONP(handleUpdate(e), callbackName);
 
             case "delete":
-                return respondJSONP(handleDelete(e));
+                return respondJSONP(handleDelete(e), callbackName);
 
             case "updateSetting":
-                return respondJSONP(handleUpdateSetting(e));
+                return respondJSONP(handleUpdateSetting(e), callbackName);
 
             case "deleteSetting":
-                return respondJSONP(handleDeleteSetting(e));
+                return respondJSONP(handleDeleteSetting(e), callbackName);
 
             // Optional batch (array of ops)
             case "batch":
-                return respondJSONP(handleBatchGET(e));
+                return respondJSONP(handleBatchGET(e), callbackName);
 
             default:
-                return respondJSONP({ error: "Unknown action: " + action });
+                return respondJSONP({ error: "Unknown action: " + action }, callbackName);
         }
     } catch (err) {
-        return respondJSONP({ error: String(err && err.message ? err.message : err) });
+        const callbackName = (e && e.parameter && e.parameter.callback) || DEFAULT_JSONP_CALLBACK;
+        return respondJSONP({ error: String(err && err.message ? err.message : err) }, callbackName);
     }
 }
 
 // For completeness; we keep doPost returning an error because client uses GET-only JSONP.
 function doPost(e) {
-    return respondJSONP({ error: "POST not supported - use GET + JSONP" });
+    const callbackName = (e && e.parameter && e.parameter.callback) || DEFAULT_JSONP_CALLBACK;
+    return respondJSONP({ error: "POST not supported - use GET + JSONP" }, callbackName);
 }
 
 /* ------------------------
    JSONP RESPONSE helper
    ------------------------ */
-function respondJSONP(obj) {
+function respondJSONP(obj, callbackName) {
+    // Sanitize callback name to ensure it's a valid JavaScript identifier
+    let callback = (callbackName || DEFAULT_JSONP_CALLBACK).toString();
+    // Remove any characters that aren't valid in JS identifiers (keep alphanumeric, underscore, $)
+    callback = callback.replace(/[^a-zA-Z0-9_$]/g, '_');
+    // Ensure it starts with a letter, underscore, or dollar sign
+    if (!/^[a-zA-Z_$]/.test(callback)) {
+        callback = 'storix_' + callback;
+    }
+    
     const payload = JSON.stringify(obj);
-    const wrapped = JSONP_CALLBACK + "(" + payload + ");";
+    const wrapped = callback + "(" + payload + ");";
     return ContentService.createTextOutput(wrapped).setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
@@ -253,7 +274,7 @@ function handleGet(e) {
     }
 
     // filters: any extra params except reserved
-    const reserved = ['sheet', 'id', 'action', 'callback', 'window', 'interval', 'minimal', 'offset', 'limit'];
+    const reserved = ['sheet', 'id', 'action', 'callback', 'window', 'interval', 'minimal', 'offset', 'limit', 'data'];
     const filters = Object.entries(e.parameter || {}).filter(([k]) => reserved.indexOf(k) === -1);
     if (filters.length) {
         rows = rows.filter(row =>
