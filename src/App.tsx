@@ -75,6 +75,7 @@ export function App() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
     const script_id = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') as string | null;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('VITE_GOOGLE_CLIENT_ID');
 
     if (savedTheme) {
       dispatch(setTheme(savedTheme))
@@ -82,7 +83,23 @@ export function App() {
       dispatch(setTheme('dark'))
     }
 
-    if (script_id) dispatch(setAuthenticated(true))
+    // Check for OAuth authentication or legacy script ID
+    if (clientId) {
+      // Initialize OAuth and check if authenticated
+      import('./services/googleAuth').then(({ googleAuth }) => {
+        googleAuth.initialize(clientId).then(() => {
+          if (googleAuth.isAuthenticated()) {
+            dispatch(setAuthenticated(true));
+          }
+        }).catch(() => {
+          // If OAuth fails, fall back to script ID if available
+          if (script_id) dispatch(setAuthenticated(true));
+        });
+      });
+    } else if (script_id) {
+      // Legacy: use script ID authentication
+      dispatch(setAuthenticated(true));
+    }
 
     // Restore activeTab from URL query parameter
     const tabFromUrl = getTabFromURL();
@@ -165,7 +182,21 @@ export function App() {
             dispatch(setSidebarOpen(false))
             updateURL(tab)
           }}
-          onLogout={() => dispatch(setAuthenticated(false))}
+          onLogout={async () => {
+            // Sign out from Google OAuth if using OAuth
+            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('VITE_GOOGLE_CLIENT_ID');
+            if (clientId) {
+              try {
+                const { googleAuth } = await import('./services/googleAuth');
+                await googleAuth.signOut();
+              } catch (error) {
+                console.error('Error signing out:', error);
+              }
+            }
+            // Clear legacy script ID if present
+            localStorage.removeItem('VITE_GOOGLE_SCRIPT_ID');
+            dispatch(setAuthenticated(false));
+          }}
         />
       </div>
 

@@ -1,22 +1,57 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Terminal, ShieldCheck, ArrowRight, Mail, Key } from 'lucide-react';
-import { jsonpRequest } from '../utils';
+import { googleAuth } from '../services/googleAuth';
 
 interface LoginProps {
   onLogin: () => void;
 }
 
-type LoginMethod = 'scriptId' | 'emailPassword';
+type LoginMethod = 'oauth' | 'scriptId' | 'emailPassword';
 
 export function Login({
   onLogin
 }: LoginProps) {
-  const [loginMethod, setLoginMethod] = React.useState<LoginMethod>('scriptId');
+  const [loginMethod, setLoginMethod] = React.useState<LoginMethod>('oauth');
   const [scriptId, setScriptId] = React.useState(() => localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') || '');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [clientId, setClientId] = React.useState(() => 
+    import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('VITE_GOOGLE_CLIENT_ID') || ''
+  );
+
+  // Initialize Google Auth on mount
+  useEffect(() => {
+    if (clientId && loginMethod === 'oauth') {
+      googleAuth.initialize(clientId).catch((err) => {
+        console.error('Failed to initialize Google Auth:', err);
+        setError('Failed to initialize Google authentication. Please check your Client ID.');
+      });
+    }
+  }, [clientId, loginMethod]);
+
+  const handleOAuthLogin = async () => {
+    if (!clientId.trim()) {
+      setError('Google Client ID is required. Please set VITE_GOOGLE_CLIENT_ID in your environment variables.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      await googleAuth.initialize(clientId);
+      const token = await googleAuth.signIn();
+      if (token) {
+        localStorage.setItem('VITE_GOOGLE_CLIENT_ID', clientId);
+        onLogin();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to authenticate with Google. Please try again.');
+      setIsLoading(false);
+    }
+  };
 
   const handleScriptIdLogin = () => {
     if (!scriptId.trim()) {
@@ -28,83 +63,14 @@ export function Login({
   };
 
   const handleEmailPasswordLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError('Email and password are required');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      // Get accounts database script ID (configured separately for accounts)
-      // This should be set via environment variable or configured separately
-      const accountsScriptId = localStorage.getItem('VITE_ACCOUNTS_SCRIPT_ID') || 
-                                import.meta.env.VITE_ACCOUNTS_SCRIPT_ID;
-      
-      if (!accountsScriptId) {
-        setError('Accounts database not configured. Please use Script ID login or configure accounts database.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Temporarily set accounts script ID to query accounts
-      const originalScriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
-      localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', accountsScriptId);
-      
-      try {
-        // Query accounts by email
-        const accounts = await jsonpRequest<any[]>('Accounts', {
-          action: 'get',
-          email: email.toLowerCase().trim()
-        });
-        
-        // Find matching account
-        const account = Array.isArray(accounts) ? accounts.find(acc => 
-          acc.email && acc.email.toLowerCase() === email.toLowerCase().trim()
-        ) : null;
-        
-        if (!account) {
-          setError('Invalid email or password');
-          setIsLoading(false);
-          return;
-        }
-
-        // Verify password (in production, use proper password hashing like bcrypt)
-        if (account.masterPassword !== password) {
-          setError('Invalid email or password');
-          setIsLoading(false);
-          return;
-        }
-
-        // Store scriptId from account for main application
-        if (account.scriptId) {
-          localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', account.scriptId);
-          onLogin();
-        } else {
-          setError('Account does not have a script ID configured');
-          setIsLoading(false);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to connect to accounts database. Please check configuration.');
-        setIsLoading(false);
-      } finally {
-        // Restore original script ID if it existed
-        if (originalScriptId) {
-          localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', originalScriptId);
-        } else {
-          // Clear temporary script ID if no original existed
-          localStorage.removeItem('VITE_GOOGLE_SCRIPT_ID');
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to authenticate. Please check your connection.');
-      setIsLoading(false);
-    }
+    setError('Email/Password login is not supported with Google Sheets API. Please use OAuth login.');
+    setIsLoading(false);
   };
 
   const handleLogin = () => {
-    if (loginMethod === 'scriptId') {
+    if (loginMethod === 'oauth') {
+      handleOAuthLogin();
+    } else if (loginMethod === 'scriptId') {
       handleScriptIdLogin();
     } else {
       handleEmailPasswordLogin();
@@ -155,7 +121,22 @@ export function Login({
           </div>
 
           {/* Login Method Toggle */}
-          <div className="flex items-center justify-center gap-3 p-2 bg-primary border border-border-primary rounded-sm">
+          <div className="flex items-center justify-center gap-3 p-2 bg-primary border border-border-primary rounded-sm flex-wrap">
+            <button
+              onClick={() => {
+                setLoginMethod('oauth');
+                setError('');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-mono transition-colors ${
+                loginMethod === 'oauth'
+                  ? 'bg-accent-blue text-white'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <ShieldCheck size={14} />
+              OAuth
+            </button>
+            <div className="text-text-muted">|</div>
             <button
               onClick={() => {
                 setLoginMethod('scriptId');
@@ -168,30 +149,49 @@ export function Login({
               }`}
             >
               <ShieldCheck size={14} />
-              Script ID
-            </button>
-            <div className="text-text-muted">|</div>
-            <button
-              onClick={() => {
-                setLoginMethod('emailPassword');
-                setError('');
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-mono transition-colors ${
-                loginMethod === 'emailPassword'
-                  ? 'bg-accent-blue text-white'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
-            >
-              <Mail size={14} />
-              Email & Password
+              Script ID (Legacy)
             </button>
           </div>
 
           <div className="space-y-4">
-            {loginMethod === 'scriptId' ? (
+            {loginMethod === 'oauth' ? (
               <div className="space-y-2">
                 <label className="text-xs text-text-muted font-mono uppercase tracking-wider block">
-                  Google Script ID <span className="text-accent-red">*</span>
+                  Google OAuth Client ID <span className="text-accent-red">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={clientId}
+                    onChange={(e) => {
+                      setClientId(e.target.value);
+                      setError('');
+                    }}
+                    placeholder="123456789-abc.apps.googleusercontent.com"
+                    className="w-full bg-primary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none font-mono"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && clientId.trim()) {
+                        handleLogin();
+                      }
+                    }}
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
+                    <ShieldCheck size={14} />
+                  </div>
+                </div>
+                {!clientId && (
+                  <p className="text-[10px] text-accent-red">
+                    Client ID is required. Get it from Google Cloud Console.
+                  </p>
+                )}
+                <p className="text-[10px] text-text-muted">
+                  You'll be redirected to Google to authorize access to your spreadsheets.
+                </p>
+              </div>
+            ) : loginMethod === 'scriptId' ? (
+              <div className="space-y-2">
+                <label className="text-xs text-text-muted font-mono uppercase tracking-wider block">
+                  Google Script ID (Legacy) <span className="text-accent-red">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -215,60 +215,7 @@ export function Login({
                 </div>
                 {!scriptId && <p className="text-[10px] text-accent-red">Script ID is required to connect to the database.</p>}
               </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <label className="text-xs text-text-muted font-mono uppercase tracking-wider block">
-                    Email <span className="text-accent-red">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        setError('');
-                      }}
-                      placeholder="user@example.com"
-                      className="w-full bg-primary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && email.trim() && password.trim()) {
-                          handleLogin();
-                        }
-                      }}
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
-                      <Mail size={14} />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs text-text-muted font-mono uppercase tracking-wider block">
-                    Password <span className="text-accent-red">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        setError('');
-                      }}
-                      placeholder="••••••••"
-                      className="w-full bg-primary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && email.trim() && password.trim()) {
-                          handleLogin();
-                        }
-                      }}
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
-                      <Key size={14} />
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+            ) : null}
 
             {error && (
               <div className="bg-accent-red/10 border border-accent-red/50 text-accent-red text-xs p-2 rounded-sm font-mono">
@@ -281,7 +228,7 @@ export function Login({
               className="w-full bg-text-primary text-tertiary hover:bg-text-secondary text-bg-primary font-bold py-3 px-4 flex items-center justify-center gap-3 transition-colors group rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={
                 isLoading ||
-                (loginMethod === 'scriptId' ? !scriptId.trim() : !email.trim() || !password.trim())
+                (loginMethod === 'oauth' ? !clientId.trim() : loginMethod === 'scriptId' ? !scriptId.trim() : false)
               }
             >
               <Terminal size={18} />

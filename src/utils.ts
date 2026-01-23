@@ -1,337 +1,97 @@
 import React, { useEffect, useState } from "react";
-// Removed broken import
+import { googleSheetsApi } from "./services/googleSheetsApi";
+import type { BatchOperation } from "./services/googleSheetsApi";
+
 export interface OptionData {
   value: string;
   label: string;
 }
 
-export const SCRIPT_ID = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
-export const SCRIPT_URL = `https://script.google.com/macros/s/${SCRIPT_ID}/exec`;
+// Legacy exports for backward compatibility (deprecated)
+export const SCRIPT_ID = null; // No longer used
+export const SCRIPT_URL = ''; // No longer used
 
-
-// export function jsonpRequest<T>(
-//   sheet: string,
-//   params: Record<string, string> = {}
-// ): Promise<T[]> {
-//   return new Promise((resolve, reject) => {
-//     if (typeof document === "undefined") {
-//       reject("Not running in a browser environment");
-//       return;
-//     }
-
-//     const callbackName = `jsonp_cb_${Date.now()}_${Math.floor(
-//       Math.random() * 1000
-//     )}`;
-//     (window as any)[callbackName] = (response: any) => {
-//       try {
-//         // console.log(`✅ JSONP Response [${sheet}]`, response);
-//         resolve(Array.isArray(response) ? response : response.data || []);
-//       } catch (err) {
-//         reject(err);
-//       } finally {
-//         delete (window as any)[callbackName];
-//         if (script.parentNode) script.parentNode.removeChild(script);
-//       }
-//     };
-
-//     const query = new URLSearchParams({
-//       sheet,
-//       callback: callbackName,
-//       ...params,
-//     }).toString();
-
-//     const script = document.createElement("script");
-//     script.src = `${SCRIPT_URL}?${query}`;
-//     script.async = true;
-//     script.onerror = () => {
-//       delete (window as any)[callbackName];
-//       reject(new Error(`JSONP request failed for ${sheet}`));
-//     };
-
-//     document.body.appendChild(script);
-//   });
-// }
-// Queue for serializing JSONP requests
-interface RequestItem {
-  sheet: string;
-  params: Record<string, string>;
-  resolve: (value: any) => void;
-  reject: (reason?: any) => void;
-  retryCount?: number;
-}
-
-const requestQueue: RequestItem[] = [];
-let isProcessingQueue = false;
-const JSONP_TIMEOUT = 30000; // 30 seconds timeout
-const MAX_RETRIES = 2; // Maximum retry attempts
-const RETRY_DELAY = 2000; // 2 seconds delay between retries
-
-const processQueue = () => {
-  if (requestQueue.length === 0) {
-    isProcessingQueue = false;
-    return;
-  }
-
-  isProcessingQueue = true;
-  const requestItem = requestQueue[0];
-  const { sheet, params, resolve, reject } = requestItem;
-  const retryCount = requestItem.retryCount || 0;
-  // Generate unique callback name for each request (ensure valid JS identifier)
-  const timestamp = Date.now();
-  const random = Math.floor(Math.random() * 1000000);
-  const callbackName = `storix_${timestamp}_${random}`;
-  let timeoutId: NodeJS.Timeout | null = null;
-  let script: HTMLScriptElement | null = null;
-  let isResolved = false;
-
-  // Enhanced error details for mobile debugging
-  const getErrorDetails = (errorType: string, additionalInfo?: string) => {
-    const scriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
-    const userAgent = navigator.userAgent;
-    const isOnline = navigator.onLine;
-    const url = script ? script.src : 'N/A';
-    
-    return {
-      errorType,
-      sheet,
-      params: JSON.stringify(params),
-      scriptId: scriptId ? `${scriptId.substring(0, 8)}...` : 'MISSING',
-      url,
-      userAgent: userAgent.substring(0, 100), // Truncate for storage
-      isOnline,
-      timestamp: new Date().toISOString(),
-      additionalInfo,
-    };
-  };
-
-  // Define request-specific callback handler
-  // IMPORTANT: Set this up BEFORE creating/loading the script to avoid race conditions
-  (window as any)[callbackName] = (response: any) => {
-    // Only handle if this is for our current request
-    if (isResolved) return; // Prevent double resolution
-    isResolved = true;
-    
-    try {
-      let data = response;
-      
-      // Check if response contains an error
-      if (data && typeof data === 'object' && data.error) {
-        const errorDetails = getErrorDetails('SERVER_ERROR', data.error);
-        const error = new Error(`Server error for ${sheet}: ${data.error}. Details: ${JSON.stringify(errorDetails)}`);
-        cleanup();
-        reject(error);
-        requestQueue.shift();
-        processQueue();
-        return;
-      }
-
-      // Handle wrapped format: { data: [...] } if applicable, though typically backend returns direct obj or array
-      // The new backend seems to return obj directly or { results: ... } for batch
-
-      if (timeoutId) clearTimeout(timeoutId);
-      cleanup();
-      resolve(data);
-      // Process next item
-      requestQueue.shift();
-      processQueue();
-    } catch (err) {
-      if (timeoutId) clearTimeout(timeoutId);
-      const errorDetails = getErrorDetails('PARSE_ERROR', err instanceof Error ? err.message : String(err));
-      const error = new Error(`Failed to parse response for ${sheet}. Details: ${JSON.stringify(errorDetails)}`);
-      cleanup();
-      reject(error);
-      // Process next item
-      requestQueue.shift();
-      processQueue();
-    }
-  };
-  
-  // Verify callback is set up before proceeding
-  if (typeof (window as any)[callbackName] !== 'function') {
-    const errorDetails = getErrorDetails('CALLBACK_SETUP_ERROR', 'Failed to set up callback function');
-    const error = new Error(`Failed to set up JSONP callback for ${sheet}. Details: ${JSON.stringify(errorDetails)}`);
-    reject(error);
-    requestQueue.shift();
-    processQueue();
-    return;
-  }
-
-  const cleanup = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-    // Clean up the unique callback function
-    try {
-      delete (window as any)[callbackName];
-    } catch (e) {
-      // Ignore cleanup errors
-    }
-    if (script && script.parentNode) {
-      script.parentNode.removeChild(script);
-    }
-    script = null;
-  };
-
-  const query = new URLSearchParams({
-    sheet,
-    callback: callbackName, // Pass dynamic callback name to backend
-    ...params,
-  }).toString();
-
-  script = document.createElement("script");
-  const scriptId = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID');
-
-  if (!scriptId) {
-    const errorDetails = getErrorDetails('MISSING_SCRIPT_ID');
-    const error = new Error(`VITE_GOOGLE_SCRIPT_ID is missing in localStorage. Details: ${JSON.stringify(errorDetails)}`);
-    reject(error);
-    // cleanup and move next
-    requestQueue.shift();
-    processQueue();
-    return;
-  }
-
-  // Check network status
-  if (!navigator.onLine) {
-    const errorDetails = getErrorDetails('OFFLINE');
-    const error = new Error(`Device is offline. Cannot fetch ${sheet}. Details: ${JSON.stringify(errorDetails)}`);
-    reject(error);
-    requestQueue.shift();
-    processQueue();
-    return;
-  }
-
-  const scriptUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
-  const fullUrl = `${scriptUrl}?${query}`;
-
-  // Double-check callback is ready before loading script
-  if (typeof (window as any)[callbackName] !== 'function') {
-    const errorDetails = getErrorDetails('CALLBACK_NOT_READY', 'Callback function not available before script load');
-    const error = new Error(`JSONP callback not ready for ${sheet}. Details: ${JSON.stringify(errorDetails)}`);
-    cleanup();
-    reject(error);
-    requestQueue.shift();
-    processQueue();
-    return;
-  }
-
-  // Set up timeout - this handles cases where script loads but callback never executes
-  timeoutId = setTimeout(() => {
-    if (isResolved) return;
-    isResolved = true;
-    
-    // Check if script loaded but callback wasn't called
-    const scriptLoaded = script && (script.readyState === 'complete' || script.readyState === 'loaded');
-    const timeoutReason = scriptLoaded 
-      ? 'Script loaded but callback was not executed. This may indicate: 1) Backend returned invalid JSONP, 2) Callback name mismatch, 3) CSP blocking script execution'
-      : `Request timed out after ${JSONP_TIMEOUT}ms. This may indicate: 1) Slow network connection, 2) Server overload, 3) Script execution timeout`;
-    
-    // Retry logic for timeout
-    if (retryCount < MAX_RETRIES) {
-      cleanup();
-      // Wait before retrying
-      setTimeout(() => {
-        requestItem.retryCount = retryCount + 1;
-        // Re-add to queue for retry
-        requestQueue.unshift(requestItem);
-        isProcessingQueue = false;
-        processQueue();
-      }, RETRY_DELAY);
-      return;
-    }
-    
-    const errorDetails = getErrorDetails('TIMEOUT', timeoutReason);
-    const error = new Error(`Request timeout for ${sheet} after ${JSONP_TIMEOUT}ms (${retryCount + 1} attempts). URL: ${fullUrl}. ${timeoutReason}. Details: ${JSON.stringify(errorDetails)}`);
-    cleanup();
-    reject(error);
-    // Process next item
-    requestQueue.shift();
-    processQueue();
-  }, JSONP_TIMEOUT);
-
-  // Set script properties before setting src to ensure proper loading
-  script.async = true;
-  script.charset = 'utf-8';
-  
-  // Set up error handler before setting src
-  script.onerror = async () => {
-    if (isResolved) return;
-    
-    // Try to fetch the URL directly to see what error we get (for debugging)
-    let diagnosticInfo = 'Script tag failed to load';
-    try {
-      // Use fetch to check what the server actually returns (this will fail due to CORS, but we can see the error)
-      const fetchResponse = await fetch(fullUrl, { method: 'GET', mode: 'no-cors' }).catch((fetchErr: any) => {
-        // Expected to fail due to CORS, but this helps us understand the issue
-        return null;
-      });
-      
-      if (fetchResponse) {
-        const text = await fetchResponse.text();
-        diagnosticInfo = `Server returned: ${text.substring(0, 200)}`;
-      }
-    } catch (diagErr) {
-      // Ignore diagnostic errors
-    }
-    
-    isResolved = true;
-    if (timeoutId) clearTimeout(timeoutId);
-    
-    // Retry logic for mobile network issues
-    if (retryCount < MAX_RETRIES) {
-      cleanup();
-      // Wait before retrying
-      setTimeout(() => {
-        requestItem.retryCount = retryCount + 1;
-        // Re-add to queue for retry
-        requestQueue.unshift(requestItem);
-        isProcessingQueue = false;
-        processQueue();
-      }, RETRY_DELAY);
-      return;
-    }
-    
-    const errorDetails = getErrorDetails('SCRIPT_LOAD_ERROR', `${diagnosticInfo} after ${retryCount + 1} attempts. Possible causes: 1) Backend script not deployed or has errors, 2) CORS/CSP restrictions, 3) Network blocking, 4) Invalid Script ID, 5) Backend returning invalid JavaScript/JSONP`);
-    const error = new Error(`JSONP script failed to load for ${sheet} after ${retryCount + 1} attempts. URL: ${fullUrl}. ${diagnosticInfo}. This may be due to: 1) Backend script not deployed with latest changes, 2) Backend script has errors, 3) CORS/CSP restrictions, 4) Network blocking, 5) Invalid Script ID. Please verify the backend script is deployed and working. Details: ${JSON.stringify(errorDetails)}`);
-    cleanup();
-    reject(error);
-    // Process next item
-    requestQueue.shift();
-    processQueue();
-  };
-  
-  // Set src AFTER setting up error handler and ensuring callback is ready
-  // This ensures the callback exists when the script executes
-  script.src = fullUrl;
-  
-  // Add load handler to detect if script loads successfully
-  script.onload = () => {
-    // Script loaded successfully - callback should be called by the script
-    // If callback isn't called within timeout, timeout handler will catch it
-    // This is just for debugging - we don't resolve here, wait for callback
-  };
-  
-  // Append to DOM - this triggers the script load
-  document.body.appendChild(script);
-};
-
-export function jsonpRequest<T>(
+/**
+ * Request function using Google Sheets API (replaces JSONP)
+ * Supports the same interface as the old jsonpRequest for backward compatibility
+ */
+export async function jsonpRequest<T>(
   sheet: string,
   params: Record<string, string> = {}
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
-    if (typeof document === "undefined") {
-      reject("Not running in a browser environment");
-      return;
-    }
+  if (typeof document === "undefined") {
+    throw new Error("Not running in a browser environment");
+  }
 
-    requestQueue.push({ sheet, params, resolve, reject });
+  const action = params.action || "get";
+  const id = params.id;
 
-    if (!isProcessingQueue) {
-      processQueue();
+  try {
+    switch (action) {
+      case "get":
+        // Convert params to filters (excluding action, id, callback, etc.)
+        const filters: Record<string, string | string[]> = {};
+        Object.entries(params).forEach(([key, value]) => {
+          if (!['action', 'id', 'callback', 'window', 'interval', 'sheet'].includes(key)) {
+            // Support comma-separated values for multi-value filters
+            if (value.includes(',')) {
+              filters[key] = value.split(',').map(v => v.trim());
+            } else {
+              filters[key] = value;
+            }
+          }
+        });
+
+        if (id) {
+          // Get single row by ID
+          const row = await googleSheetsApi.getRowById(sheet, id);
+          return (row ? [row] : []) as T;
+        } else {
+          // Get all rows with filters
+          const rows = await googleSheetsApi.getSheetData(sheet, filters);
+          return rows as T;
+        }
+
+      case "create":
+        if (!params.data) {
+          throw new Error("Missing data payload");
+        }
+        const createData = JSON.parse(params.data);
+        const createResult = await googleSheetsApi.createRow(sheet, createData);
+        return [{ ...createResult, ...createData }] as T;
+
+      case "update":
+        if (!id || !params.data) {
+          throw new Error("Missing id or data");
+        }
+        const updateData = JSON.parse(params.data);
+        await googleSheetsApi.updateRow(sheet, id, updateData);
+        return [{ status: "updated", id, ...updateData }] as T;
+
+      case "delete":
+        if (!id) {
+          throw new Error("Missing id");
+        }
+        await googleSheetsApi.deleteRow(sheet, id);
+        return [{ status: "deleted", id }] as T;
+
+      case "batch":
+        if (!params.data) {
+          throw new Error("Missing batch payload");
+        }
+        const batchData = JSON.parse(params.data);
+        if (!batchData.operations || !Array.isArray(batchData.operations)) {
+          throw new Error("Missing operations[]");
+        }
+        const batchResult = await googleSheetsApi.batchOperations(batchData.operations as BatchOperation[]);
+        return [{ status: batchResult.status, results: batchResult.results }] as T;
+
+      default:
+        throw new Error(`Invalid action: ${action}`);
     }
-  });
+  } catch (error) {
+    throw error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 
