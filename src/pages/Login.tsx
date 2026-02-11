@@ -11,25 +11,23 @@ type LoginMethod = 'oauth' | 'scriptId' | 'emailPassword';
 export function Login({
   onLogin
 }: LoginProps) {
-  const [loginMethod, setLoginMethod] = React.useState<LoginMethod>('oauth');
-  const [scriptId, setScriptId] = React.useState(() => localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') || '');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState('');
-  const [clientId, setClientId] = React.useState(() => 
+  const [clientId, setClientId] = React.useState(() =>
     import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('VITE_GOOGLE_CLIENT_ID') || ''
   );
 
   // Initialize Google Auth on mount
   useEffect(() => {
-    if (clientId && loginMethod === 'oauth') {
+    if (clientId) {
       googleAuth.initialize(clientId).catch((err) => {
         console.error('Failed to initialize Google Auth:', err);
         setError('Failed to initialize Google authentication. Please check your Client ID.');
       });
     }
-  }, [clientId, loginMethod]);
+  }, [clientId]);
 
   const handleOAuthLogin = async () => {
     if (!clientId.trim()) {
@@ -53,28 +51,8 @@ export function Login({
     }
   };
 
-  const handleScriptIdLogin = () => {
-    if (!scriptId.trim()) {
-      setError('Script ID is required');
-      return;
-    }
-    localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', scriptId.trim());
-    onLogin();
-  };
-
-  const handleEmailPasswordLogin = async () => {
-    setError('Email/Password login is not supported with Google Sheets API. Please use OAuth login.');
-    setIsLoading(false);
-  };
-
   const handleLogin = () => {
-    if (loginMethod === 'oauth') {
-      handleOAuthLogin();
-    } else if (loginMethod === 'scriptId') {
-      handleScriptIdLogin();
-    } else {
-      handleEmailPasswordLogin();
-    }
+    handleOAuthLogin();
   };
 
   return <div className="w-full h-screen bg-primary flex items-center justify-center p-4 relative overflow-hidden text-text-primary">
@@ -91,17 +69,17 @@ export function Login({
       <div className="p-8">
         {/* Banner Image */}
         <div className="mb-8 flex justify-center">
-          <img 
-            src="/banner.png" 
-            alt="Storix Banner" 
+          <img
+            src="/banner.png"
+            alt="Storix Banner"
             className="h-20 w-auto object-contain"
           />
         </div>
-        
+
         <div className="flex items-center gap-3 mb-8">
-          <img 
-            src="/logo.png" 
-            alt="Storix Logo" 
+          <img
+            src="/logo.png"
+            alt="Storix Logo"
             className="w-10 h-10 object-contain"
           />
           <div>
@@ -120,102 +98,40 @@ export function Login({
             <p className="animate-pulse">{'>'} Awaiting user credentials_</p>
           </div>
 
-          {/* Login Method Toggle */}
-          <div className="flex items-center justify-center gap-3 p-2 bg-primary border border-border-primary rounded-sm flex-wrap">
-            <button
-              onClick={() => {
-                setLoginMethod('oauth');
-                setError('');
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-mono transition-colors ${
-                loginMethod === 'oauth'
-                  ? 'bg-accent-blue text-white'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
-            >
-              <ShieldCheck size={14} />
-              OAuth
-            </button>
-            <div className="text-text-muted">|</div>
-            <button
-              onClick={() => {
-                setLoginMethod('scriptId');
-                setError('');
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-mono transition-colors ${
-                loginMethod === 'scriptId'
-                  ? 'bg-accent-blue text-white'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
-            >
-              <ShieldCheck size={14} />
-              Script ID (Legacy)
-            </button>
-          </div>
-
           <div className="space-y-4">
-            {loginMethod === 'oauth' ? (
-              <div className="space-y-2">
-                <label className="text-xs text-text-muted font-mono uppercase tracking-wider block">
-                  Google OAuth Client ID <span className="text-accent-red">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={clientId}
-                    onChange={(e) => {
-                      setClientId(e.target.value);
-                      setError('');
-                    }}
-                    placeholder="123456789-abc.apps.googleusercontent.com"
-                    className="w-full bg-primary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none font-mono"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && clientId.trim()) {
-                        handleLogin();
-                      }
-                    }}
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
-                    <ShieldCheck size={14} />
-                  </div>
+            <div className="space-y-2">
+              <label className="text-xs text-text-muted font-mono uppercase tracking-wider block">
+                Google OAuth Client ID <span className="text-accent-red">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => {
+                    setClientId(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="123456789-abc.apps.googleusercontent.com"
+                  className="w-full bg-primary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && clientId.trim()) {
+                      handleLogin();
+                    }
+                  }}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
+                  <ShieldCheck size={14} />
                 </div>
-                {!clientId && (
-                  <p className="text-[10px] text-accent-red">
-                    Client ID is required. Get it from Google Cloud Console.
-                  </p>
-                )}
-                <p className="text-[10px] text-text-muted">
-                  You'll be redirected to Google to authorize access to your spreadsheets.
+              </div>
+              {!clientId && (
+                <p className="text-[10px] text-accent-red">
+                  Client ID is required. Get it from Google Cloud Console.
                 </p>
-              </div>
-            ) : loginMethod === 'scriptId' ? (
-              <div className="space-y-2">
-                <label className="text-xs text-text-muted font-mono uppercase tracking-wider block">
-                  Google Script ID (Legacy) <span className="text-accent-red">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={scriptId}
-                    onChange={(e) => {
-                      setScriptId(e.target.value);
-                      setError('');
-                    }}
-                    placeholder="AKfycbx..."
-                    className="w-full bg-primary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none font-mono"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && scriptId.trim()) {
-                        handleLogin();
-                      }
-                    }}
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
-                    <ShieldCheck size={14} />
-                  </div>
-                </div>
-                {!scriptId && <p className="text-[10px] text-accent-red">Script ID is required to connect to the database.</p>}
-              </div>
-            ) : null}
+              )}
+              <p className="text-[10px] text-text-muted">
+                You'll be redirected to Google to authorize access to your spreadsheets.
+              </p>
+            </div>
 
             {error && (
               <div className="bg-accent-red/10 border border-accent-red/50 text-accent-red text-xs p-2 rounded-sm font-mono">
@@ -227,8 +143,7 @@ export function Login({
               onClick={handleLogin}
               className="w-full bg-text-primary text-tertiary hover:bg-text-secondary text-bg-primary font-bold py-3 px-4 flex items-center justify-center gap-3 transition-colors group rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={
-                isLoading ||
-                (loginMethod === 'oauth' ? !clientId.trim() : loginMethod === 'scriptId' ? !scriptId.trim() : false)
+                isLoading || !clientId.trim()
               }
             >
               <Terminal size={18} />

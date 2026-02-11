@@ -71,34 +71,29 @@ export function App() {
     return 'dashboard';
   }
 
-  // Initialize theme and restore from URL
+  // Initialize theme and checkout auth on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
-    const script_id = localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') as string | null;
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('VITE_GOOGLE_CLIENT_ID');
 
+    // Initialize theme
     if (savedTheme) {
       dispatch(setTheme(savedTheme))
     } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       dispatch(setTheme('dark'))
     }
 
-    // Check for OAuth authentication or legacy script ID
+    // Initialize OAuth authentication
     if (clientId) {
-      // Initialize OAuth and check if authenticated
       import('./services/googleAuth').then(({ googleAuth }) => {
         googleAuth.initialize(clientId).then(() => {
           if (googleAuth.isAuthenticated()) {
             dispatch(setAuthenticated(true));
           }
-        }).catch(() => {
-          // If OAuth fails, fall back to script ID if available
-          if (script_id) dispatch(setAuthenticated(true));
+        }).catch((err) => {
+          console.error('Failed to initialize Google Auth:', err);
         });
       });
-    } else if (script_id) {
-      // Legacy: use script ID authentication
-      dispatch(setAuthenticated(true));
     }
 
     // Restore activeTab from URL query parameter
@@ -159,9 +154,9 @@ export function App() {
           >
             <Menu size={24} />
           </button>
-          <img 
-            src="/logo.png" 
-            alt="Storix Logo" 
+          <img
+            src="/logo.png"
+            alt="Storix Logo"
             className="h-6 w-auto object-contain"
           />
           <span className="font-bold text-lg">Storix</span>
@@ -193,8 +188,7 @@ export function App() {
                 console.error('Error signing out:', error);
               }
             }
-            // Clear legacy script ID if present
-            localStorage.removeItem('VITE_GOOGLE_SCRIPT_ID');
+            // Clear authentication state
             dispatch(setAuthenticated(false));
           }}
         />
@@ -253,7 +247,7 @@ export function App() {
 
       {/* Network Status */}
       <NetworkStatus />
-      
+
       {/* Snackbar Container */}
       <SnackbarContainer
         messages={snackbarMessages}

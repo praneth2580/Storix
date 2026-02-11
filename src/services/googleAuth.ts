@@ -22,41 +22,46 @@ class GoogleAuthService {
   private scope = 'https://www.googleapis.com/auth/spreadsheets';
   private tokenClient: google.accounts.oauth2.TokenClient | null = null;
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   /**
    * Initialize Google OAuth client
    */
   async initialize(clientId: string): Promise<void> {
-    if (this.isInitialized && this.clientId === clientId) {
-      return;
+    if (this.initPromise && this.clientId === clientId) {
+      return this.initPromise;
     }
 
     this.clientId = clientId;
 
-    // Load Google Identity Services library if not already loaded
-    if (typeof window !== 'undefined' && !window.google?.accounts) {
-      await this.loadGoogleIdentityServices();
-    }
+    this.initPromise = (async () => {
+      // Load Google Identity Services library if not already loaded
+      if (typeof window !== 'undefined' && !window.google?.accounts) {
+        await this.loadGoogleIdentityServices();
+      }
 
-    // Wait for Google Identity Services to be available
-    await this.waitForGoogleIdentityServices();
+      // Wait for Google Identity Services to be available
+      await this.waitForGoogleIdentityServices();
 
-    // Initialize token client
-    this.tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: this.scope,
-      callback: (response: google.accounts.oauth2.TokenResponse) => {
-        if (response.error) {
-          console.error('OAuth error:', response.error);
-          return;
-        }
-        this.accessToken = response.access_token;
-        this.tokenExpiry = Date.now() + (response.expires_in * 1000);
-        this.saveTokenToStorage();
-      },
-    });
+      // Initialize token client
+      this.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: this.scope,
+        callback: (response: google.accounts.oauth2.TokenResponse) => {
+          if (response.error) {
+            console.error('OAuth error:', response.error);
+            return;
+          }
+          this.accessToken = response.access_token;
+          this.tokenExpiry = Date.now() + (response.expires_in * 1000);
+          this.saveTokenToStorage();
+        },
+      });
 
-    this.isInitialized = true;
+      this.isInitialized = true;
+    })();
+
+    return this.initPromise;
   }
 
   /**
@@ -107,8 +112,13 @@ class GoogleAuthService {
    * Request access token (triggers OAuth flow if needed)
    */
   async getAccessToken(): Promise<string> {
+    // If initialization is in progress, wait for it
+    if (this.initPromise) {
+      await this.initPromise;
+    }
+
     if (!this.tokenClient) {
-      throw new Error('Google Auth not initialized. Call initialize() first.');
+      throw new Error('Google Auth not initialized. Pass VITE_GOOGLE_CLIENT_ID to initialize().');
     }
 
     // Check if we have a valid token

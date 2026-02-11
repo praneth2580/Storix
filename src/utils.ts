@@ -7,13 +7,11 @@ export interface OptionData {
   label: string;
 }
 
-// Legacy exports for backward compatibility (deprecated)
-export const SCRIPT_ID = null; // No longer used
-export const SCRIPT_URL = ''; // No longer used
+// No longer using legacy Script ID / JSONP authentication.
 
 /**
- * Request function using Google Sheets API (replaces JSONP)
- * Supports the same interface as the old jsonpRequest for backward compatibility
+ * Request function using Google Sheets API.
+ * Maintains the same interface as the old jsonpRequest for model compatibility.
  */
 export async function jsonpRequest<T>(
   sheet: string,

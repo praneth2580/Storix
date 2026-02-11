@@ -48,11 +48,7 @@ export function Settings({
     cols: 2,
   });
   const [localStoreSettings, setLocalStoreSettings] = useState(storeSettings);
-  const [googleScriptId, setGoogleScriptId] = useState(() => localStorage.getItem('VITE_GOOGLE_SCRIPT_ID') || '');
   const [accountsScriptId, setAccountsScriptId] = useState(() => localStorage.getItem('VITE_ACCOUNTS_SCRIPT_ID') || DEFAULT_ACCOUNTS_SCRIPT_ID);
-  const [showLinkScriptModal, setShowLinkScriptModal] = useState(false);
-  const [linkEmail, setLinkEmail] = useState('');
-  const [linkPassword, setLinkPassword] = useState('');
   const [isLinking, setIsLinking] = useState(false);
 
   useEffect(() => {
@@ -479,126 +475,22 @@ export function Settings({
                   <Database size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold">Google Sheets Database</h3>
+                  <h3 className="font-bold">Google Sheets API</h3>
                   <p className="text-xs text-text-muted">
-                    {googleScriptId ? `Script ID: ${googleScriptId.substring(0, 20)}...` : 'Not configured'}
+                    Connected via OAuth 2.0
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded border ${googleScriptId
-                  ? 'text-accent-green bg-accent-green/10 border-accent-green/10'
-                  : 'text-text-muted bg-primary border-border-primary'
-                  }`}>
-                  <CheckCircle2 size={12} /> {googleScriptId ? 'Connected' : 'Not Connected'}
+                <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded border text-accent-green bg-accent-green/10 border-accent-green/10">
+                  <CheckCircle2 size={12} /> Connected
                 </span>
-                <button
-                  onClick={() => setShowLinkScriptModal(true)}
-                  className="p-2 hover:bg-tertiary rounded text-text-muted hover:text-accent-blue transition-colors"
-                  title="Link Script ID with Email/Password"
-                >
-                  <Link2 size={16} />
-                </button>
                 <button className="p-2 hover:bg-tertiary rounded text-text-muted hover:text-text-primary transition-colors" title="Sync Now">
                   <RefreshCw size={16} />
                 </button>
               </div>
             </div>
 
-            <div className="bg-primary border border-border-primary p-4 rounded-sm space-y-3">
-              <div className="space-y-2">
-                <label className="text-xs text-text-muted uppercase font-bold tracking-wider flex items-center gap-2">
-                  <Globe size={14} />
-                  Google Apps Script ID
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={googleScriptId}
-                    onChange={(e) => setGoogleScriptId(e.target.value)}
-                    placeholder="AKfycbx..."
-                    className="w-full bg-secondary border border-border-primary text-text-primary text-sm p-3 rounded-sm focus:border-accent-blue focus:outline-none font-mono pr-10"
-                  />
-                  {googleScriptId && (
-                    <button
-                      onClick={() => setGoogleScriptId('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-red transition-colors"
-                      title="Clear"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-text-muted">
-                  Your Google Apps Script deployment ID. This connects Storix to your Google Sheets database.
-                  <br />
-                  <span className="text-accent-blue">Note:</span> Changing this will require a page reload to take effect.
-                </p>
-                <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-sm">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle size={14} className="text-yellow-500 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs text-text-muted">
-                      <strong className="text-yellow-500">Mobile Troubleshooting:</strong> If you're experiencing connection errors on mobile, ensure:
-                      <ul className="list-disc list-inside mt-1 space-y-0.5">
-                        <li>Script is deployed as "Web app" (not "API executable")</li>
-                        <li>Execute as: "Me"</li>
-                        <li>Who has access: "Anyone" (or "Anyone with Google account")</li>
-                        <li>Use the "Test & Save" button to verify connection</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-border-primary">
-                <button
-                  onClick={async (e) => {
-                    if (!googleScriptId.trim()) {
-                      alert('Please enter a valid Google Script ID.');
-                      return;
-                    }
-
-                    const button = e.currentTarget;
-                    const originalHTML = button.innerHTML;
-                    button.disabled = true;
-                    button.innerHTML = '<span>⏳ Testing...</span>';
-
-                    try {
-                      // Test connection before saving
-                      const { testScriptConnection } = await import('../utils/scriptTester');
-                      const testResult = await testScriptConnection(googleScriptId.trim());
-
-                      if (testResult.success) {
-                        localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', googleScriptId.trim());
-                        alert(`✅ Connection test successful!\nResponse time: ${testResult.details?.responseTime}ms\n\nThe page will reload to apply changes.`);
-                        window.location.reload();
-                      } else {
-                        const errorMsg = `❌ Connection test failed!\n\nError: ${testResult.error}\n\nCommon mobile issues:\n1. Script not deployed as "Web app"\n2. Access not set to "Anyone"\n3. CORS/CSP restrictions\n4. Network blocking script tags\n\nCheck the Logs page for detailed error information.`;
-                        alert(errorMsg);
-                        // Ask if user wants to save anyway
-                        if (confirm('Do you want to save the Script ID anyway? (You can test it later)')) {
-                          localStorage.setItem('VITE_GOOGLE_SCRIPT_ID', googleScriptId.trim());
-                          window.location.reload();
-                        }
-                      }
-                    } catch (err) {
-                      alert(`Test failed: ${err instanceof Error ? err.message : String(err)}`);
-                    } finally {
-                      button.disabled = false;
-                      button.innerHTML = originalHTML;
-                    }
-                  }}
-                  className="bg-accent-blue hover:bg-blue-600 text-white px-4 py-2 rounded-sm flex items-center gap-2 text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  <Save size={16} />
-                  Test & Save Script ID
-                </button>
-              </div>
-            </div>
-
-            <div className="text-xs text-text-muted font-mono">
-              Last sync: {new Date().toLocaleString()}
-            </div>
           </div>
 
           {/* Accounts Database Section */}
@@ -658,188 +550,6 @@ export function Settings({
           </div>
         </section>
 
-        {/* Link Script ID Modal */}
-        {showLinkScriptModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-secondary border border-border-primary w-full max-w-md shadow-2xl rounded-lg overflow-hidden">
-              <div className="flex justify-between items-center p-4 border-b border-border-primary bg-tertiary">
-                <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Link2 size={18} className="text-accent-blue" />
-                  Link Script ID
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowLinkScriptModal(false);
-                    setLinkEmail('');
-                    setLinkPassword('');
-                  }}
-                  className="text-text-muted hover:text-text-primary transition-colors p-1 hover:bg-primary rounded"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                {!googleScriptId ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-sm p-3">
-                    <p className="text-xs text-text-muted">
-                      <strong className="text-yellow-500">⚠️ No Script ID Configured:</strong> Please configure a Script ID first before linking it with email/password.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-sm p-3">
-                      <p className="text-xs text-text-muted">
-                        <strong className="text-blue-500">Secure Storage:</strong> Your password and current script ID ({googleScriptId.substring(0, 20)}...) will be encrypted using your password as the encryption key before saving.
-                      </p>
-                    </div>
-
-                    <div className="bg-primary border border-border-primary p-3 rounded-sm">
-                      <div className="text-xs text-text-muted uppercase font-bold tracking-wider mb-1 flex items-center gap-2">
-                        <Database size={14} />
-                        Current Script ID
-                      </div>
-                      <div className="text-sm font-mono text-text-primary break-all">
-                        {googleScriptId}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs text-text-muted uppercase font-bold tracking-wider flex items-center gap-2">
-                        <Mail size={14} />
-                        Email Address <span className="text-accent-red">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        value={linkEmail}
-                        onChange={(e) => setLinkEmail(e.target.value)}
-                        placeholder="user@example.com"
-                        className="w-full bg-primary border border-border-primary p-3 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && linkEmail.trim() && linkPassword.trim()) {
-                            // Trigger save on Enter
-                            const saveButton = document.querySelector('[data-link-save]') as HTMLButtonElement;
-                            if (saveButton && !saveButton.disabled) {
-                              saveButton.click();
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs text-text-muted uppercase font-bold tracking-wider flex items-center gap-2">
-                        <Key size={14} />
-                        Password <span className="text-accent-red">*</span>
-                      </label>
-                      <input
-                        type="password"
-                        value={linkPassword}
-                        onChange={(e) => setLinkPassword(e.target.value)}
-                        placeholder="Enter password"
-                        className="w-full bg-primary border border-border-primary p-3 text-sm focus:border-accent-blue focus:outline-none rounded-sm transition-colors"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && linkEmail.trim() && linkPassword.trim()) {
-                            // Trigger save on Enter
-                            const saveButton = document.querySelector('[data-link-save]') as HTMLButtonElement;
-                            if (saveButton && !saveButton.disabled) {
-                              saveButton.click();
-                            }
-                          }
-                        }}
-                      />
-                      <p className="text-xs text-text-muted">
-                        This password will be used to encrypt both the password and script ID
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="flex justify-end gap-2 p-4 border-t border-border-primary bg-tertiary">
-                <button
-                  onClick={() => {
-                    setShowLinkScriptModal(false);
-                    setLinkEmail('');
-                    setLinkPassword('');
-                  }}
-                  className="px-4 py-2 border border-border-primary hover:bg-primary rounded-sm transition-colors"
-                  disabled={isLinking}
-                >
-                  Cancel
-                </button>
-                <button
-                  data-link-save
-                  onClick={async () => {
-                    if (!googleScriptId) {
-                      alert('Please configure a Script ID first');
-                      return;
-                    }
-
-                    if (!linkEmail.trim() || !linkPassword.trim()) {
-                      alert('Please fill in email and password');
-                      return;
-                    }
-
-                    setIsLinking(true);
-                    try {
-                      // Encrypt password and current script ID using the password as the key
-                      const encryptedPassword = await encryptWithPassword(linkPassword, linkPassword);
-                      const encryptedScriptId = await encryptWithPassword(googleScriptId, linkPassword);
-
-                      // Check if account already exists
-                      const { getAccounts } = await import('../models/accounts/accounts');
-                      const existingAccounts = await getAccounts();
-                      const existingAccount = existingAccounts.find(acc =>
-                        acc.email && acc.email.toLowerCase() === linkEmail.toLowerCase().trim()
-                      );
-
-                      const accountData = {
-                        email: linkEmail.trim(),
-                        masterPassword: encryptedPassword, // Store encrypted password
-                        scriptId: encryptedScriptId, // Store encrypted script ID
-                        createdAt: existingAccount?.createdAt || new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                      };
-
-                      let account: Account;
-                      if (existingAccount) {
-                        // Update existing account
-                        account = new Account({
-                          ...existingAccount,
-                          ...accountData,
-                        });
-                        await account.updateAccount();
-                        alert('✅ Account updated successfully!\n\nYour credentials have been encrypted and saved to the accounts database.');
-                      } else {
-                        // Create new account
-                        account = new Account({
-                          id: '', // Will be generated by backend
-                          ...accountData,
-                        });
-                        await account.createAccount();
-                        alert('✅ Account created successfully!\n\nYour credentials have been encrypted and saved to the accounts database.');
-                      }
-
-                      setShowLinkScriptModal(false);
-                      setLinkEmail('');
-                      setLinkPassword('');
-                    } catch (error) {
-                      console.error('Error saving account:', error);
-                      alert(`Failed to save account: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease ensure the Accounts Database Script ID is configured correctly.`);
-                    } finally {
-                      setIsLinking(false);
-                    }
-                  }}
-                  className="px-4 py-2 bg-accent-blue hover:bg-blue-600 text-white rounded-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isLinking || !googleScriptId || !linkEmail.trim() || !linkPassword.trim()}
-                >
-                  <Save size={16} />
-                  {isLinking ? 'Encrypting & Saving...' : 'Encrypt & Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Label Layouts Section */}
         <section className="bg-secondary border border-border-primary p-6 rounded-lg">
