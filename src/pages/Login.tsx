@@ -153,10 +153,15 @@ export function Login({
               )}
             </button>
 
-            <div className="text-center">
-              <span className="text-text-muted text-xs">
+            <div className="text-center mt-6 space-y-2">
+              <span className="text-text-muted text-xs block">
                 Restricted Access. Authorized Personnel Only.
               </span>
+              <div className="flex justify-center gap-4 text-xs font-mono">
+                <a href="?page=privacy-policy" className="text-accent-blue hover:text-text-primary transition-colors">Privacy Policy</a>
+                <span className="text-text-muted">|</span>
+                <a href="?page=terms-of-service" className="text-accent-blue hover:text-text-primary transition-colors">Terms of Service</a>
+              </div>
             </div>
           </div>
         </div>

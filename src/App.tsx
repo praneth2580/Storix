@@ -23,6 +23,8 @@ const VALID_TABS = [
   'reports',
   'logs',
   'settings',
+  'privacy-policy',
+  'terms-of-service',
 ] as const;
 
 type ValidTab = typeof VALID_TABS[number];
@@ -45,6 +47,8 @@ import { NetworkStatus } from './components/NetworkStatus'
 import { useAppSelector, useAppDispatch } from './store/hooks'
 import { removeSnackbar } from './store/slices/snackbarSlice'
 import { getAccounts } from './models/accounts/accounts';
+import { PrivacyPolicy } from './pages/PrivacyPolicy'
+import { TermsOfService } from './pages/TermsOfService'
 
 export function App() {
   const dispatch = useDispatch()
@@ -137,6 +141,14 @@ export function App() {
 
   const handleToggleTheme = () => {
     dispatch(toggleTheme())
+  }
+
+  if (activeTab === 'privacy-policy') {
+    return <PrivacyPolicy />
+  }
+
+  if (activeTab === 'terms-of-service') {
+    return <TermsOfService />
   }
 
   if (!isAuthenticated) {
@@ -234,6 +246,8 @@ export function App() {
           'reports',
           'logs',
           'settings',
+          'privacy-policy',
+          'terms-of-service',
         ].includes(activeTab) && (
             <div className="flex items-center justify-center h-full text-text-muted flex-col gap-4">
               <div className="text-6xl font-mono opacity-20">404</div>
