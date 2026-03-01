@@ -1,7 +1,7 @@
 
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { IProduct, IVariant } from '../../types/models';
-import { getProducts } from '../../models/product';
+import { getProducts, deleteProduct } from '../../models/product';
 import { getVariants } from '../../models/variants';
 import { getStocks } from '../../models/stock';
 
@@ -51,6 +51,11 @@ export const fetchProducts = createAsyncThunk('inventory/fetchProducts', async (
     return joined;
 });
 
+export const removeProduct = createAsyncThunk('inventory/removeProduct', async (id: string) => {
+    await deleteProduct(id);
+    return id;
+});
+
 const inventorySlice = createSlice({
     name: 'inventory',
     initialState,
@@ -69,6 +74,9 @@ const inventorySlice = createSlice({
             .addCase(fetchProducts.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.error.message || 'Failed to fetch products';
+            })
+            .addCase(removeProduct.fulfilled, (state, action: PayloadAction<string>) => {
+                state.items = state.items.filter(item => item.id !== action.payload);
             });
     },
 });

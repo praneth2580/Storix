@@ -6,7 +6,7 @@ export function TermsOfService() {
             <div className="max-w-4xl mx-auto bg-secondary p-8 rounded-lg shadow-lg border border-border-primary">
                 <div className="flex items-center gap-4 mb-8">
                     <img
-                        src="/logo.png"
+                        src="/Storix/logo.png"
                         alt="Storix Logo"
                         className="w-12 h-12 object-contain"
                     />

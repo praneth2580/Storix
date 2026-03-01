@@ -12,21 +12,29 @@ export function Dashboard() {
 
   const { items: products, loading: productsLoading } = useAppSelector(state => state.inventory);
   const { items: sales, loading: salesLoading } = useAppSelector(state => state.sales);
-  
+
   const isLoading = productsLoading || salesLoading;
 
   // Calculate Metrics
-  const totalInventoryValue = products.reduce((sum, p) => sum + (p.defaultSellingPrice * 0), 0); // Stock is not available in IProduct yet.
-  const lowStockCount = 0; // Mocked until we fetch Stock data
-  const activeSkuCount = products.length; // Assume all fetched products are active for now
-  const recentSalesCount = sales.length; // Mocking 'Pending Orders' with total sales count for now or 0
+  const totalInventoryValue = products.reduce((sum, p) => {
+    // Sum price * stock for each variant
+    const productValue = (p.variants || []).reduce((vSum, v) => {
+      const price = typeof v.price === 'number' ? v.price : 0;
+      const stock = typeof v.stock === 'number' ? v.stock : 0;
+      return vSum + (price * stock);
+    }, 0);
+    return sum + productValue;
+  }, 0);
+  const lowStockCount = products.filter(p => (p.totalStock || 0) < (p.minStockLevel || 10) && (p.totalStock || 0) > 0).length;
+  const activeSkuCount = products.length;
+  const recentSalesCount = sales.length;
 
   // Mock data for charts (keep for visual until we have time-series data)
   const chartData1 = [65, 59, 80, 81, 56, 55, 40, 60, 75, 85, 90, 100];
   const chartData2 = [20, 25, 30, 28, 35, 40, 45, 42, 50, 55, 60, 65];
   const chartData3 = [85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30];
   const chartData4 = [45, 50, 45, 55, 48, 52, 58, 50, 60, 65, 62, 70];
-  
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -34,7 +42,7 @@ export function Dashboard() {
       </div>
     );
   }
-  
+
   return <div className="p-6 h-full overflow-y-auto bg-primary text-text-primary">
     <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
       <div>

@@ -9,6 +9,7 @@ import {
   setSidebarOpen,
   toggleSidebar,
 } from './store/slices/uiSlice'
+import { getStoredSpreadsheetId, setStoredSpreadsheetId, googleSheetsApi } from './services/googleSheetsApi'
 
 // Valid tabs for routing
 const VALID_TABS = [
@@ -25,6 +26,7 @@ const VALID_TABS = [
   'settings',
   'privacy-policy',
   'terms-of-service',
+  'help-spreadsheet-id',
 ] as const;
 
 type ValidTab = typeof VALID_TABS[number];
@@ -41,7 +43,7 @@ import { Settings } from './pages/Settings'
 import { POS } from './pages/POS'
 import { Reports } from './pages/Reports'
 import { Logs } from './pages/Logs'
-import { Menu } from 'lucide-react'
+import { Menu, AlertTriangle } from 'lucide-react'
 import { SnackbarContainer } from './components/Snackbar'
 import { NetworkStatus } from './components/NetworkStatus'
 import { useAppSelector, useAppDispatch } from './store/hooks'
@@ -49,6 +51,7 @@ import { removeSnackbar } from './store/slices/snackbarSlice'
 import { getAccounts } from './models/accounts/accounts';
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import { TermsOfService } from './pages/TermsOfService'
+import { HelpSpreadsheetId } from './pages/HelpSpreadsheetId'
 
 export function App() {
   const dispatch = useDispatch()
@@ -57,6 +60,11 @@ export function App() {
     (state: RootState) => state.ui
   )
   const snackbarMessages = useAppSelector(state => state.snackbar.messages)
+
+  const [isSheetBlocked, setIsSheetBlocked] = React.useState(false);
+  const [sheetIdInput, setSheetIdInput] = React.useState('');
+  const [isVerifyingSheet, setIsVerifyingSheet] = React.useState(false);
+  const [uninitializedId, setUninitializedId] = React.useState('');
 
   // Function to update URL without page reload
   const updateURL = (tab: string) => {
@@ -78,7 +86,7 @@ export function App() {
   // Initialize theme and checkout auth on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('VITE_GOOGLE_CLIENT_ID');
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
     // Initialize theme
     if (savedTheme) {
@@ -87,14 +95,15 @@ export function App() {
       dispatch(setTheme('dark'))
     }
 
-    // Initialize OAuth authentication
+    // Initialize OAuth authentication (client ID from .env)
     if (clientId) {
       import('./services/googleAuth').then(({ googleAuth }) => {
-        googleAuth.initialize(clientId).then(() => {
-          if (googleAuth.isAuthenticated()) {
-            dispatch(setAuthenticated(true));
-          }
-        }).catch((err) => {
+        // Immediate check from localStorage
+        if (googleAuth.isAuthenticated()) {
+          dispatch(setAuthenticated(true));
+        }
+
+        googleAuth.initialize(clientId).catch((err) => {
           console.error('Failed to initialize Google Auth:', err);
         });
       });
@@ -107,6 +116,85 @@ export function App() {
       updateURL(tabFromUrl);
     }
   }, [dispatch])
+
+  // Check Sheet ID validity on auth
+  useEffect(() => {
+    if (isAuthenticated) {
+      const storedId = getStoredSpreadsheetId();
+      // Only block if ID is empty or it's the default ID but the user might not have access
+      // Let's verify access to whatever is stored.
+      setIsSheetBlocked(false); // Reset while checking
+
+      googleSheetsApi.verifySheetAccess(storedId).then(isAccessible => {
+        if (!isAccessible) {
+          setIsSheetBlocked(true);
+        }
+      });
+    }
+  }, [isAuthenticated]);
+
+  const saveAndApplySheetId = (id: string) => {
+    setStoredSpreadsheetId(id);
+    const savedIds = JSON.parse(localStorage.getItem('saved_google_sheet_ids') || '[]');
+    if (!savedIds.includes(id)) {
+      localStorage.setItem('saved_google_sheet_ids', JSON.stringify([...savedIds, id]));
+    }
+    setIsSheetBlocked(false);
+    window.location.reload();
+  };
+
+  const handleVerifyGlobalSheetId = async () => {
+    if (!sheetIdInput.trim()) return;
+    setIsVerifyingSheet(true);
+    try {
+      const id = sheetIdInput.trim();
+      const isAccessible = await googleSheetsApi.verifySheetAccess(id);
+      if (isAccessible) {
+        setStoredSpreadsheetId(id); // Temporarily set it so API calls can read it
+        const status = await googleSheetsApi.checkSpreadsheetStatus(id);
+
+        if (status === 'empty') {
+          // Auto initialize if empty
+          const initSuccess = await googleSheetsApi.initializeSpreadsheet(id, false);
+          if (initSuccess) {
+            saveAndApplySheetId(id);
+          } else {
+            alert('Connected, but failed to initialize the required sheets.');
+          }
+        } else if (status === 'not_empty') {
+          // Prompt user to overwrite
+          setUninitializedId(id);
+        } else {
+          alert('Failed to check the spreadsheet status.');
+        }
+      } else {
+        alert('Access Denied. Please ensure the Google Sheet ID is correct and shared with your authenticated Google account.');
+      }
+    } catch {
+      alert('Error verifying Sheet ID.');
+    } finally {
+      setIsVerifyingSheet(false);
+    }
+  };
+
+  const handleConfirmOverwrite = async () => {
+    if (!uninitializedId) return;
+    setIsVerifyingSheet(true);
+    try {
+      setStoredSpreadsheetId(uninitializedId);
+      const success = await googleSheetsApi.initializeSpreadsheet(uninitializedId, true);
+      if (success) {
+        saveAndApplySheetId(uninitializedId);
+      } else {
+        alert('Failed to initialize and overwrite the sheet.');
+      }
+    } catch {
+      alert('Error during initialization.');
+    } finally {
+      setIsVerifyingSheet(false);
+      setUninitializedId('');
+    }
+  };
 
   // Handle browser back/forward buttons
   useEffect(() => {
@@ -151,6 +239,10 @@ export function App() {
     return <TermsOfService />
   }
 
+  if (activeTab === 'help-spreadsheet-id') {
+    return <HelpSpreadsheetId />
+  }
+
   if (!isAuthenticated) {
     return <Login onLogin={() => dispatch(setAuthenticated(true))} />
   }
@@ -167,13 +259,82 @@ export function App() {
             <Menu size={24} />
           </button>
           <img
-            src="/logo.png"
+            src="/Storix/logo.png"
             alt="Storix Logo"
             className="h-6 w-auto object-contain"
           />
           <span className="font-bold text-lg">Storix</span>
         </div>
       </div>
+
+      {/* Global Sheet ID Block Modal */}
+      {isSheetBlocked && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-4">
+          <div className="bg-secondary p-8 rounded-lg shadow-2xl max-w-md w-full border border-accent-blue/50 text-center">
+            <div className="w-16 h-16 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Connect Google Sheets</h2>
+            <p className="text-text-muted mb-6 text-sm">
+              Your account doesn't have access to the currently configured Google Sheet database. Please enter a valid Google Spreadsheet ID that your account can access to continue.
+            </p>
+            <a
+              href="?page=help-spreadsheet-id"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-accent-blue hover:underline text-xs mb-4"
+            >
+              <HelpCircle size={14} />
+              How do I find my Spreadsheet ID?
+            </a>
+            {uninitializedId ? (
+              <div className="space-y-4">
+                <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-500 mb-4 text-sm text-left">
+                  <span className="font-bold flex items-center gap-2 mb-2">
+                    <AlertTriangle size={16} /> Warning: Sheet is not empty
+                  </span>
+                  The Google Sheet you provided already contains data or other sheets. Using it as your database requires deleting existing conflicting sheets (like Products, Sales, etc.) and initializing the system schema.
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setUninitializedId('')}
+                    disabled={isVerifyingSheet}
+                    className="flex-1 bg-secondary border border-border-primary hover:bg-tertiary text-text-primary font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmOverwrite}
+                    disabled={isVerifyingSheet}
+                    className="flex-1 bg-accent-red hover:bg-red-600 text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50"
+                  >
+                    {isVerifyingSheet ? 'Initializing...' : 'Delete & Initialize'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Google Spreadsheet ID"
+                  value={sheetIdInput}
+                  onChange={e => setSheetIdInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleVerifyGlobalSheetId()}
+                  className="w-full bg-primary border border-border-primary p-3 rounded-md focus:border-accent-blue focus:outline-none font-mono text-center"
+                  autoFocus
+                />
+                <button
+                  onClick={handleVerifyGlobalSheetId}
+                  disabled={!sheetIdInput.trim() || isVerifyingSheet}
+                  className="w-full bg-accent-blue hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {isVerifyingSheet ? 'Verifying Access...' : 'Connect Database'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Persistent Sidebar */}
       <div
@@ -190,9 +351,8 @@ export function App() {
             updateURL(tab)
           }}
           onLogout={async () => {
-            // Sign out from Google OAuth if using OAuth
-            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('VITE_GOOGLE_CLIENT_ID');
-            if (clientId) {
+            // Sign out from Google OAuth (client ID from .env)
+            if (import.meta.env.VITE_GOOGLE_CLIENT_ID) {
               try {
                 const { googleAuth } = await import('./services/googleAuth');
                 await googleAuth.signOut();

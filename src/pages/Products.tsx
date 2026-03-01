@@ -6,7 +6,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 
 import { useAppSelector, useDataPolling, useAppDispatch } from '../store/hooks';
 import { ImageInput } from '../components/ImageInput';
-import { fetchProducts, InventoryProduct } from '../store/slices/inventorySlice';
+import { fetchProducts, removeProduct, InventoryProduct } from '../store/slices/inventorySlice';
 import { fetchSuppliers } from '../store/slices/suppliersSlice';
 import { fetchSales } from '../store/slices/salesSlice';
 import { IProduct, IVariant, ISale } from '../types/models';
@@ -223,11 +223,14 @@ export function Products() {
       alert("Failed to save variant");
     }
   };
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
-      // setProducts(products.filter(p => p.id !== id)); // Redux state is immutable directly
-      console.log("Delete product", id);
-      alert("Delete not implemented in Redux yet");
+      try {
+        await dispatch(removeProduct(id)).unwrap();
+      } catch (error) {
+        console.error("Delete product failed:", error);
+        alert("Failed to delete product.");
+      }
     }
   };
 

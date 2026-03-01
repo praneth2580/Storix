@@ -21,12 +21,12 @@ interface SettingsState {
   storeSettings: StoreSettings;
   storeSettingsLoading: boolean;
   storeSettingsError: string | null;
-  
+
   // Label Layouts
   labelLayouts: LabelLayout[];
   labelLayoutsLoading: boolean;
   labelLayoutsError: string | null;
-  
+
   // General settings map (for easy access)
   settingsMap: Record<string, string>;
 }
@@ -56,33 +56,36 @@ const initialState: SettingsState = {
 export const fetchStoreSettings = createAsyncThunk(
   'settings/fetchStoreSettings',
   async () => {
-    const response = await jsonpRequest<{ settings: Record<string, { value: string; updatedAt: string }> }>('Settings', {
-      action: 'getSettings'
+    // Fetch all rows from the Settings sheet
+    const rows = await jsonpRequest<any[]>('Settings', {
+      action: 'get'
     });
-    
-    if (response && response.settings) {
-      const storeSettings: StoreSettings = {
-        shopName: response.settings.shopName?.value || response.settings.storeName?.value || '',
-        storeName: response.settings.storeName?.value || '',
-        storeAddress: response.settings.storeAddress?.value || '',
-        storeCity: response.settings.storeCity?.value || '',
-        storeState: response.settings.storeState?.value || '',
-        storeZip: response.settings.storeZip?.value || '',
-        storeEmail: response.settings.storeEmail?.value || '',
-        storePhone: response.settings.storePhone?.value || '',
-        upiMerchantId: response.settings.upiMerchantId?.value || '',
-        merchantUPI: response.settings.merchantUPI?.value || '',
-      };
-      
-      // Build settings map for easy access
+
+    if (rows && Array.isArray(rows) && rows.length > 0) {
+      // Build settings map from key-value rows
       const settingsMap: Record<string, string> = {};
-      Object.entries(response.settings).forEach(([key, setting]) => {
-        settingsMap[key] = setting.value;
+      rows.forEach((row: any) => {
+        if (row.key) {
+          settingsMap[row.key] = row.value || '';
+        }
       });
-      
+
+      const storeSettings: StoreSettings = {
+        shopName: settingsMap['shopName'] || settingsMap['storeName'] || '',
+        storeName: settingsMap['storeName'] || '',
+        storeAddress: settingsMap['storeAddress'] || '',
+        storeCity: settingsMap['storeCity'] || '',
+        storeState: settingsMap['storeState'] || '',
+        storeZip: settingsMap['storeZip'] || '',
+        storeEmail: settingsMap['storeEmail'] || '',
+        storePhone: settingsMap['storePhone'] || '',
+        upiMerchantId: settingsMap['upiMerchantId'] || '',
+        merchantUPI: settingsMap['merchantUPI'] || '',
+      };
+
       return { storeSettings, settingsMap };
     }
-    
+
     return { storeSettings: initialState.storeSettings, settingsMap: {} };
   }
 );
@@ -103,13 +106,29 @@ export const saveStoreSettings = createAsyncThunk(
       { key: 'merchantUPI', value: storeSettings.merchantUPI },
     ];
 
-    // Save all settings sequentially
+    // Save all settings sequentially using standard create/update
     for (const setting of settingsToSave) {
       if (setting.value) {
-        await jsonpRequest('Settings', {
-          action: 'updateSetting',
-          data: JSON.stringify({ key: setting.key, value: setting.value })
+        // Check if this key already exists
+        const existing = await jsonpRequest<any[]>('Settings', {
+          action: 'get',
+          key: setting.key
         });
+
+        if (existing && Array.isArray(existing) && existing.length > 0 && existing[0].id) {
+          // Update existing
+          await jsonpRequest('Settings', {
+            action: 'update',
+            id: existing[0].id,
+            data: JSON.stringify({ key: setting.key, value: setting.value })
+          });
+        } else {
+          // Create new
+          await jsonpRequest('Settings', {
+            action: 'create',
+            data: JSON.stringify({ key: setting.key, value: setting.value })
+          });
+        }
       }
     }
 
@@ -201,7 +220,7 @@ const settingsSlice = createSlice({
         state.storeSettingsLoading = false;
         state.storeSettingsError = action.error.message || 'Failed to save store settings';
       });
-    
+
     // Label Layouts
     builder
       .addCase(fetchLabelLayouts.pending, (state) => {

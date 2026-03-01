@@ -8,7 +8,7 @@ export const errorMiddleware: Middleware = (store) => (next) => (action) => {
     const error = action.error || action.payload;
     const errorMessage = error?.message || error?.toString() || 'An error occurred';
     const actionName = action.type.split('/')[0] || 'Unknown';
-    
+
     // Extract additional error details
     let errorDetails = errorMessage;
     try {
@@ -22,7 +22,7 @@ export const errorMiddleware: Middleware = (store) => (next) => (action) => {
       // If parsing fails, use original message
       errorDetails = errorMessage;
     }
-    
+
     // Create user-friendly error message
     let userMessage = errorMessage;
     if (errorMessage.includes('TIMEOUT')) {
@@ -40,15 +40,20 @@ export const errorMiddleware: Middleware = (store) => (next) => (action) => {
       }
     } else if (errorMessage.includes('PARSE_ERROR')) {
       userMessage = `Invalid response from server. Please try again.`;
+    } else if (errorMessage.includes('PERMISSION_DENIED')) {
+      userMessage = `Permission Denied! Your Google account cannot access the configured Google Sheet. Please share the sheet with your email address or check your VITE_GOOGLE_SPREADSHEET_ID.`;
     }
-    
+
+    // Special formatting for permission denied to be very clear
+    const finalMessage = errorMessage.includes('PERMISSION_DENIED') ? userMessage : `${actionName}: ${userMessage}`;
+
     // Dispatch snackbar notification with user-friendly message
     store.dispatch(addSnackbar({
-      message: `${actionName}: ${userMessage}`,
+      message: finalMessage,
       type: 'error',
       duration: 8000, // Longer duration for mobile
     }));
-    
+
     // Log detailed error for debugging
     store.dispatch(addLog({
       level: 'error',
@@ -57,7 +62,7 @@ export const errorMiddleware: Middleware = (store) => (next) => (action) => {
       details: errorDetails,
     }));
   }
-  
+
   return next(action);
 };
 

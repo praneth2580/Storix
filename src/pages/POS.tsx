@@ -16,7 +16,7 @@ export function POS() {
   const dispatch = useAppDispatch();
   useDataPolling(fetchProducts, 60000, 'Products'); // 1 min poll for POS
   const { items: products, loading } = useAppSelector(state => state.inventory);
-  
+
   // Settings from Redux
   const settingsMap = useAppSelector(state => state.settings.settingsMap);
   const storeSettings = useAppSelector(state => state.settings.storeSettings);
@@ -94,7 +94,7 @@ export function POS() {
   const handleBarcodeScanned = useCallback((barcode: string) => {
     // Find product by barcode
     const product = products.find(p => p.barcode === barcode);
-    
+
     if (product) {
       addToCart(product);
       // Stop scanner after successful scan
@@ -110,7 +110,7 @@ export function POS() {
 
   const startScanner = useCallback(async () => {
     if (!scanContainerRef.current) return;
-    
+
     try {
       const html5QrCode = new Html5Qrcode("barcode-scanner");
       scannerRef.current = html5QrCode;
@@ -161,16 +161,16 @@ export function POS() {
     const merchantName = storeSettings.shopName || storeSettings.storeName || 'Storix POS';
     const amount = total.toFixed(2);
     const transactionNote = `Payment for Order #${Date.now().toString().slice(-8)}`;
-    
+
     // Validate merchant VPA
     if (!merchantVPA || merchantVPA === 'your-merchant@paytm') {
       console.warn('UPI Merchant ID not configured. Please set it in Settings.');
       // Return a placeholder QR or show error
       return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&ecc=M&data=${encodeURIComponent('Please configure UPI Merchant ID in Settings')}`;
     }
-    
+
     const upiUrl = `upi://pay?pa=${merchantVPA}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
-    
+
     // Generate QR code using QR Server API
     return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&ecc=M&data=${encodeURIComponent(upiUrl)}`;
   }, [storeSettings, total]);
@@ -178,14 +178,14 @@ export function POS() {
   const handleQRPaymentClick = () => {
     setPaymentMethod('qr');
   };
-  
+
   const handleCheckout = () => {
     // If QR payment is selected, show QR code modal
     if (paymentMethod === 'qr') {
       setShowUPIQr(true);
       return;
     }
-    
+
     // For other payment methods, proceed with normal checkout
     setIsCheckingOut(true);
     setTimeout(() => {
@@ -217,7 +217,7 @@ export function POS() {
 
     const invoiceId = `POS-${Date.now().toString().slice(-8)}`;
     const invoiceDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    
+
     const itemsRows = cart.map(item => `
       <tr>
         <td>${item.name}</td>
@@ -431,10 +431,10 @@ export function POS() {
         <div class="invoice-box">
           <div class="header-section">
             <div class="invoice-logo">
-              <img src="/pos-logo.png" alt="Storix POS Logo" />
+              <img src="/Storix/pos-logo.png" alt="Storix POS Logo" />
             </div>
             <div class="invoice-banner">
-              <img src="/pos-banner.png" alt="Storix POS Banner" />
+              <img src="/Storix/pos-banner.png" alt="Storix POS Banner" />
             </div>
             <div class="invoice-number">Invoice #${invoiceId}</div>
           </div>
@@ -533,16 +533,16 @@ export function POS() {
       <div className="bg-white text-black p-8 max-w-md w-full shadow-2xl font-mono relative rounded-sm">
         <div className="text-center mb-6 border-b-2 border-dashed border-black pb-6">
           <div className="flex justify-center mb-3">
-            <img 
-              src="/pos-logo.png" 
-              alt="Storix POS Logo" 
+            <img
+              src="/Storix/pos-logo.png"
+              alt="Storix POS Logo"
               className="h-12 w-auto object-contain"
             />
           </div>
           <div className="mb-3">
-            <img 
-              src="/pos-banner.png" 
-              alt="Storix POS Banner" 
+            <img
+              src="/Storix/pos-banner.png"
+              alt="Storix POS Banner"
               className="h-16 w-full object-contain mx-auto"
             />
           </div>
@@ -583,7 +583,7 @@ export function POS() {
             <ScanBarcode size={48} className="opacity-50" />
           </div>
           <p className="text-xs">Thank you for your business!</p>
-          <button 
+          <button
             onClick={handleDownloadInvoice}
             className="w-full bg-accent-blue hover:bg-blue-600 text-white py-3 font-bold transition-colors flex items-center justify-center gap-2 rounded-sm"
           >
@@ -610,7 +610,7 @@ export function POS() {
               <X size={24} />
             </button>
           </div>
-          
+
           {(!storeSettings.upiMerchantId && !storeSettings.merchantUPI) ? (
             <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg mb-4">
               <p className="text-sm text-yellow-800 font-semibold mb-2">UPI Merchant ID Not Configured</p>
@@ -628,9 +628,9 @@ export function POS() {
             <>
               <div className="bg-white p-6 rounded-lg flex flex-col items-center mb-4">
                 <div className="mb-4">
-                  <img 
-                    src={generateUPIQRCode()} 
-                    alt="UPI Payment QR Code" 
+                  <img
+                    src={generateUPIQRCode()}
+                    alt="UPI Payment QR Code"
                     className="w-64 h-64 rounded-lg"
                     onError={(e) => {
                       console.error('Failed to load QR code image');
@@ -696,8 +696,8 @@ export function POS() {
               <X size={24} />
             </button>
           </div>
-          <div 
-            id="barcode-scanner" 
+          <div
+            id="barcode-scanner"
             ref={scanContainerRef}
             className="w-full rounded-lg overflow-hidden bg-black"
             style={{ minHeight: '300px' }}
@@ -708,22 +708,22 @@ export function POS() {
         </div>
       </div>
     )}
-    
+
     {/* Left Side: Product Catalog */}
     <div className="flex-1 flex flex-col border-r border-border-primary overflow-hidden pb-0 lg:pb-0">
       {/* Search & Filter Bar */}
       <div className="p-3 sm:p-4 bg-secondary border-b border-border-primary flex flex-col sm:flex-row gap-3 sm:gap-4 shrink-0">
         <div className="relative flex-1">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input 
-            type="text" 
-            placeholder="Scan barcode or search..." 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            autoFocus 
-            className="w-full bg-primary border border-border-primary text-text-primary py-2.5 sm:py-3 pl-10 pr-12 text-sm sm:text-base focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue placeholder-text-muted rounded-sm" 
+          <input
+            type="text"
+            placeholder="Scan barcode or search..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            autoFocus
+            className="w-full bg-primary border border-border-primary text-text-primary py-2.5 sm:py-3 pl-10 pr-12 text-sm sm:text-base focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue placeholder-text-muted rounded-sm"
           />
-          <button 
+          <button
             onClick={() => isScanning ? stopScanner() : startScanner()}
             className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors touch-manipulation ${isScanning ? 'text-accent-red hover:text-red-600 bg-accent-red/10' : 'text-text-muted hover:text-accent-blue hover:bg-accent-blue/10'}`}
             title={isScanning ? 'Stop Scanner' : 'Start Barcode Scanner'}
@@ -733,9 +733,9 @@ export function POS() {
         </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
           {['All', 'Electronics', 'Furniture', 'Accessories', 'Peripherals'].map(cat => (
-            <button 
-              key={cat} 
-              onClick={() => setCategory(cat)} 
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
               className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap border rounded-sm transition-colors touch-manipulation ${category === cat ? 'bg-accent-blue/20 border-accent-blue text-accent-blue' : 'bg-primary border-border-primary text-text-muted hover:border-border-secondary active:bg-tertiary'}`}
             >
               {cat}
@@ -759,9 +759,9 @@ export function POS() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {filteredProducts.map(product => (
-              <button 
-                key={product.id} 
-                onClick={() => addToCart(product)} 
+              <button
+                key={product.id}
+                onClick={() => addToCart(product)}
                 className="bg-secondary border border-border-primary p-3 sm:p-4 hover:border-accent-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] active:scale-[0.98] transition-all text-left group flex flex-col h-full rounded-lg touch-manipulation"
               >
                 <div className="flex justify-between items-start mb-2">
@@ -812,8 +812,8 @@ export function POS() {
           </span>
         </div>
         {cart.length > 0 && (
-          <button 
-            onClick={clearCart} 
+          <button
+            onClick={clearCart}
             className="text-text-muted hover:text-accent-red text-xs flex items-center gap-1 transition-colors touch-manipulation p-1.5 rounded hover:bg-accent-red/10"
           >
             <Trash2 size={14} /> <span className="hidden sm:inline">Clear</span>
@@ -830,8 +830,8 @@ export function POS() {
           </div>
         ) : (
           cart.map(item => (
-            <div 
-              key={item.id} 
+            <div
+              key={item.id}
               className="bg-primary border border-border-primary p-3 flex justify-between items-center group rounded-sm gap-3"
             >
               <div className="flex-1 min-w-0">
@@ -844,8 +844,8 @@ export function POS() {
               </div>
               <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                 <div className="flex items-center bg-secondary border border-border-primary rounded-sm">
-                  <button 
-                    onClick={() => updateQuantity(item.id, -1)} 
+                  <button
+                    onClick={() => updateQuantity(item.id, -1)}
                     className="p-1.5 sm:p-1 hover:text-accent-red active:bg-accent-red/10 transition-colors touch-manipulation"
                   >
                     <Minus size={14} />
@@ -853,8 +853,8 @@ export function POS() {
                   <span className="w-8 sm:w-8 text-center font-mono text-sm">
                     {item.quantity}
                   </span>
-                  <button 
-                    onClick={() => updateQuantity(item.id, 1)} 
+                  <button
+                    onClick={() => updateQuantity(item.id, 1)}
                     className="p-1.5 sm:p-1 hover:text-accent-blue active:bg-accent-blue/10 transition-colors touch-manipulation"
                   >
                     <Plus size={14} />
@@ -889,36 +889,36 @@ export function POS() {
         </div>
 
         <div className="grid grid-cols-3 gap-2 mb-3 sm:mb-4">
-          <button 
-            onClick={() => setPaymentMethod('card')} 
+          <button
+            onClick={() => setPaymentMethod('card')}
             className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors touch-manipulation active:scale-95 ${paymentMethod === 'card' ? 'bg-accent-blue/20 border-accent-blue text-accent-blue' : 'bg-secondary border-border-primary text-text-muted'}`}
           >
             <CreditCard size={16} /> <span className="hidden sm:inline">Card</span>
           </button>
-          <button 
-            onClick={() => setPaymentMethod('cash')} 
+          <button
+            onClick={() => setPaymentMethod('cash')}
             className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors touch-manipulation active:scale-95 ${paymentMethod === 'cash' ? 'bg-accent-green/20 border-accent-green text-accent-green' : 'bg-secondary border-border-primary text-text-muted'}`}
           >
             <Banknote size={16} /> <span className="hidden sm:inline">Cash</span>
           </button>
-          <button 
-            onClick={handleQRPaymentClick} 
+          <button
+            onClick={handleQRPaymentClick}
             className={`p-2 flex flex-col items-center justify-center gap-1 text-xs border rounded-sm transition-colors touch-manipulation active:scale-95 ${paymentMethod === 'qr' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-secondary border-border-primary text-text-muted'}`}
           >
             <QrCode size={16} /> <span className="hidden sm:inline">QR</span>
           </button>
         </div>
 
-        <button 
-          onClick={handleDownloadInvoice} 
+        <button
+          onClick={handleDownloadInvoice}
           disabled={cart.length === 0}
           className="w-full mb-2 sm:mb-3 bg-secondary hover:bg-tertiary border border-border-primary text-text-primary py-2.5 font-medium rounded-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98] text-sm sm:text-base"
         >
           <Download size={16} /> <span className="hidden sm:inline">Download</span> Invoice
         </button>
-        <button 
-          onClick={handleCheckout} 
-          disabled={cart.length === 0 || isCheckingOut} 
+        <button
+          onClick={handleCheckout}
+          disabled={cart.length === 0 || isCheckingOut}
           className={`w-full py-3 sm:py-4 font-bold text-base sm:text-lg flex items-center justify-center gap-2 transition-all rounded-sm touch-manipulation active:scale-[0.98] ${isCheckingOut ? 'bg-accent-green text-white cursor-wait' : cart.length === 0 ? 'bg-border-primary text-text-muted cursor-not-allowed' : 'bg-accent-blue hover:bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]'}`}
         >
           {isCheckingOut ? (

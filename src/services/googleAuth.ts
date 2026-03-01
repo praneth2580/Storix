@@ -23,6 +23,8 @@ class GoogleAuthService {
   private tokenClient: google.accounts.oauth2.TokenClient | null = null;
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
+  private pendingResolve: ((token: string) => void) | null = null;
+  private pendingReject: ((error: Error) => void) | null = null;
 
   /**
    * Initialize Google OAuth client
@@ -50,11 +52,21 @@ class GoogleAuthService {
         callback: (response: google.accounts.oauth2.TokenResponse) => {
           if (response.error) {
             console.error('OAuth error:', response.error);
+            if (this.pendingReject) {
+              this.pendingReject(new Error(response.error));
+              this.pendingReject = null;
+              this.pendingResolve = null;
+            }
             return;
           }
           this.accessToken = response.access_token;
           this.tokenExpiry = Date.now() + (response.expires_in * 1000);
           this.saveTokenToStorage();
+          if (this.pendingResolve) {
+            this.pendingResolve(response.access_token);
+            this.pendingResolve = null;
+            this.pendingReject = null;
+          }
         },
       });
 
@@ -141,15 +153,8 @@ class GoogleAuthService {
         return;
       }
 
-      const originalCallback = this.tokenClient.callback;
-      this.tokenClient.callback = (response: google.accounts.oauth2.TokenResponse) => {
-        originalCallback(response);
-        if (response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response.access_token);
-        }
-      };
+      this.pendingResolve = resolve;
+      this.pendingReject = reject;
 
       this.tokenClient.requestAccessToken({ prompt: 'consent' });
     });
