@@ -2,6 +2,8 @@
 
 Storix is a powerful, privacy-focused inventory management and POS system that uses **Google Sheets as its database**. No backend setup, no database hosting—just your data, in your hands.
 
+### 🌐 [Live Demo](https://praneth2580.github.io/Storix) | 🚀 [Landing Page](https://praneth2580.github.io/Storix/?page=landing)
+
 ![Storix Dashboard](public/dashboard_preview.png)
 
 ## ✨ Features
