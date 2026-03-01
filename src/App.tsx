@@ -27,6 +27,8 @@ const VALID_TABS = [
   'privacy-policy',
   'terms-of-service',
   'help-spreadsheet-id',
+  'landing',
+  'login',
 ] as const;
 
 type ValidTab = typeof VALID_TABS[number];
@@ -43,7 +45,7 @@ import { Settings } from './pages/Settings'
 import { POS } from './pages/POS'
 import { Reports } from './pages/Reports'
 import { Logs } from './pages/Logs'
-import { Menu, AlertTriangle } from 'lucide-react'
+import { Menu, AlertTriangle, HelpCircle } from 'lucide-react'
 import { SnackbarContainer } from './components/Snackbar'
 import { NetworkStatus } from './components/NetworkStatus'
 import { useAppSelector, useAppDispatch } from './store/hooks'
@@ -52,6 +54,7 @@ import { getAccounts } from './models/accounts/accounts';
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import { TermsOfService } from './pages/TermsOfService'
 import { HelpSpreadsheetId } from './pages/HelpSpreadsheetId'
+import { LandingPage } from './pages/LandingPage'
 
 export function App() {
   const dispatch = useDispatch()
@@ -80,7 +83,7 @@ export function App() {
     if (tabFromUrl && VALID_TABS.includes(tabFromUrl)) {
       return tabFromUrl;
     }
-    return 'dashboard';
+    return 'landing';
   }
 
   // Initialize theme and checkout auth on mount
@@ -243,8 +246,17 @@ export function App() {
     return <HelpSpreadsheetId />
   }
 
-  if (!isAuthenticated) {
+  if (activeTab === 'landing') {
+    return <LandingPage />
+  }
+
+  if (activeTab === 'login') {
     return <Login onLogin={() => dispatch(setAuthenticated(true))} />
+  }
+
+  if (!isAuthenticated) {
+    // If not landing/help/privacy, show landing page as the home for unauthenticated users
+    return <LandingPage />
   }
 
   return (
