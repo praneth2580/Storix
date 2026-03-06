@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Globe, Database, Moon, Sun, Shield, Save, RefreshCw, CheckCircle2, Package, Plus, Edit, Trash2, Copy, X, Store, QrCode, AlertTriangle, Mail, Key, Link2 } from 'lucide-react';
+import { User, Globe, Database, Moon, Sun, Shield, Save, RefreshCw, CheckCircle2, Package, Plus, Edit, Trash2, Copy, X, Store, QrCode, AlertTriangle, Mail, Key, Link2, ExternalLink } from 'lucide-react';
 import { LabelLayoutEditor } from '../components/LabelLayoutEditor';
 import { LabelLayout } from '../types/labelLayout';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -725,15 +725,26 @@ export function Settings({
                         <span className="text-[10px] bg-accent-blue text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Active</span>
                       )}
                     </div>
-                    {savedSheetIds.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveSheetId(id)}
-                        className="text-text-muted hover:text-accent-red p-1 transition-colors ml-2 flex-shrink-0"
-                        title="Remove ID"
+                    <div className="flex items-center gap-1">
+                      <a
+                        href={`https://docs.google.com/spreadsheets/d/${id}/edit`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-text-muted hover:text-accent-blue p-1 transition-colors flex-shrink-0"
+                        title="Open Sheet in New Tab"
                       >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
+                        <ExternalLink size={16} />
+                      </a>
+                      {savedSheetIds.length > 1 && (
+                        <button
+                          onClick={() => handleRemoveSheetId(id)}
+                          className="text-text-muted hover:text-accent-red p-1 transition-colors flex-shrink-0"
+                          title="Remove ID"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

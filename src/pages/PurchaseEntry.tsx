@@ -26,9 +26,14 @@ export function PurchaseEntry() {
 
   const { items: products, loading: productsLoading } = useAppSelector(state => state.inventory);
   const { items: suppliers, loading: suppliersLoading } = useAppSelector(state => state.suppliers);
-  
+
   const loading = productsLoading || suppliersLoading;
-  
+
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [cost, setCost] = useState(0);
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -36,11 +41,6 @@ export function PurchaseEntry() {
       </div>
     );
   }
-
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [cost, setCost] = useState(0);
 
   const handleProductSelect = (id: string) => {
     setSelectedProduct(id);

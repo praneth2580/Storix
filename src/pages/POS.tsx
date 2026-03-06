@@ -2,13 +2,12 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Search, ScanBarcode, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, X, CheckCircle2, RotateCcw, Download } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useAppSelector, useAppDispatch, useDataPolling } from '../store/hooks';
-import { fetchProducts } from '../store/slices/inventorySlice';
+import { fetchProducts, InventoryProduct } from '../store/slices/inventorySlice';
 import { fetchStoreSettings } from '../store/slices/settingsSlice';
 import { addLog } from '../store/slices/logSlice';
-import { IProduct } from '../types/models';
 import { Loader } from '../components/Loader';
 
-type CartItem = IProduct & {
+type CartItem = InventoryProduct & {
   quantity: number;
 };
 export function POS() {
@@ -61,7 +60,7 @@ export function POS() {
   });
 
   // Cart Logic
-  const addToCart = useCallback((product: IProduct) => {
+  const addToCart = useCallback((product: InventoryProduct) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -150,7 +149,7 @@ export function POS() {
   };
   const clearCart = () => setCart([]);
   // Totals
-  const subtotal = cart.reduce((sum, item) => sum + (item.defaultSellingPrice || 0) * item.quantity, 0);
+  const subtotal = cart.reduce((sum, item) => sum + (item.variants?.[0]?.price || 0) * item.quantity, 0);
   const tax = subtotal * 0.08;
   const total = subtotal + tax;
 
@@ -222,8 +221,8 @@ export function POS() {
       <tr>
         <td>${item.name}</td>
         <td class="text-center">${item.quantity}</td>
-        <td class="text-right">$${item.defaultSellingPrice.toFixed(2)}</td>
-        <td class="text-right">$${(item.defaultSellingPrice * item.quantity).toFixed(2)}</td>
+        <td class="text-right">$${(item.variants?.[0]?.price || 0).toFixed(2)}</td>
+        <td class="text-right">$${((item.variants?.[0]?.price || 0) * item.quantity).toFixed(2)}</td>
       </tr>
     `).join('');
 
@@ -555,7 +554,7 @@ export function POS() {
             <span>
               {item.quantity}x {item.name}
             </span>
-            <span>${(item.defaultSellingPrice * item.quantity).toFixed(2)}</span>
+            <span>${((item.variants?.[0]?.price || 0) * item.quantity).toFixed(2)}</span>
           </div>)}
         </div>
 
@@ -775,7 +774,7 @@ export function POS() {
                 </h3>
                 <div className="flex justify-between items-end mt-2">
                   <span className="font-mono text-base sm:text-lg text-accent-blue">
-                    ${product.defaultSellingPrice.toFixed(2)}
+                    ${(product.variants?.[0]?.price || 0).toFixed(2)}
                   </span>
                   <div className="w-6 h-6 bg-tertiary rounded flex items-center justify-center text-text-muted group-hover:bg-accent-blue group-hover:text-white transition-colors">
                     <Plus size={14} />
@@ -839,7 +838,7 @@ export function POS() {
                   {item.name}
                 </div>
                 <div className="text-xs font-mono text-text-muted">
-                  ${item.defaultSellingPrice.toFixed(2)} / unit
+                  ${(item.variants?.[0]?.price || 0).toFixed(2)} / unit
                 </div>
               </div>
               <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
@@ -861,7 +860,7 @@ export function POS() {
                   </button>
                 </div>
                 <div className="w-16 sm:w-16 text-right font-mono text-sm font-bold text-text-primary">
-                  ${(item.defaultSellingPrice * item.quantity).toFixed(2)}
+                  ${((item.variants?.[0]?.price || 0) * item.quantity).toFixed(2)}
                 </div>
               </div>
             </div>

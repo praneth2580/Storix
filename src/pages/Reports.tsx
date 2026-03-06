@@ -42,9 +42,14 @@ export function Reports() {
     const { items: sales, loading: salesLoading } = useAppSelector(state => state.sales);
     const { items: purchases, loading: purchasesLoading } = useAppSelector(state => state.purchases);
     const { items: products, loading: productsLoading } = useAppSelector(state => state.inventory);
-    
+
     const loading = salesLoading || purchasesLoading || productsLoading;
-    
+
+    const [reportType, setReportType] = useState<ReportType>('all')
+    const [dateFrom, setDateFrom] = useState('2024-01-01')
+    const [dateTo, setDateTo] = useState('2024-12-31') // Extended default range
+    const [showExportMenu, setShowExportMenu] = useState(false)
+
     if (loading) {
         return (
             <div className="h-full flex items-center justify-center">
@@ -52,11 +57,6 @@ export function Reports() {
             </div>
         );
     }
-
-    const [reportType, setReportType] = useState<ReportType>('all')
-    const [dateFrom, setDateFrom] = useState('2024-01-01')
-    const [dateTo, setDateTo] = useState('2024-12-31') // Extended default range
-    const [showExportMenu, setShowExportMenu] = useState(false)
     // Mock chart data (still mock for now as we don't have historical data structure in Redux state yet)
     const salesChartData = [45, 52, 48, 65, 58, 72, 68, 75, 82, 78, 88, 95]
     const inventoryChartData = [

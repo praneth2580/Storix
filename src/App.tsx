@@ -251,7 +251,17 @@ export function App() {
   }
 
   if (activeTab === 'login') {
-    return <Login onLogin={() => dispatch(setAuthenticated(true))} />
+    if (isAuthenticated) {
+      // Already authenticated, redirect to dashboard
+      dispatch(setActiveTab('dashboard'));
+      updateURL('dashboard');
+      return null;
+    }
+    return <Login onLogin={() => {
+      dispatch(setAuthenticated(true));
+      dispatch(setActiveTab('dashboard'));
+      updateURL('dashboard');
+    }} />
   }
 
   if (!isAuthenticated) {

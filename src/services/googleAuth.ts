@@ -37,40 +37,46 @@ class GoogleAuthService {
     this.clientId = clientId;
 
     this.initPromise = (async () => {
-      // Load Google Identity Services library if not already loaded
-      if (typeof window !== 'undefined' && !window.google?.accounts) {
-        await this.loadGoogleIdentityServices();
-      }
+      try {
+        // Load Google Identity Services library if not already loaded
+        if (typeof window !== 'undefined' && !window.google?.accounts) {
+          await this.loadGoogleIdentityServices();
+        }
 
-      // Wait for Google Identity Services to be available
-      await this.waitForGoogleIdentityServices();
+        // Wait for Google Identity Services to be available
+        await this.waitForGoogleIdentityServices();
 
-      // Initialize token client
-      this.tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: this.scope,
-        callback: (response: google.accounts.oauth2.TokenResponse) => {
-          if (response.error) {
-            console.error('OAuth error:', response.error);
-            if (this.pendingReject) {
-              this.pendingReject(new Error(response.error));
-              this.pendingReject = null;
-              this.pendingResolve = null;
+        // Initialize token client
+        this.tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: this.scope,
+          callback: (response: google.accounts.oauth2.TokenResponse) => {
+            if (response.error) {
+              console.error('OAuth error:', response.error);
+              if (this.pendingReject) {
+                this.pendingReject(new Error(response.error));
+                this.pendingReject = null;
+                this.pendingResolve = null;
+              }
+              return;
             }
-            return;
-          }
-          this.accessToken = response.access_token;
-          this.tokenExpiry = Date.now() + (response.expires_in * 1000);
-          this.saveTokenToStorage();
-          if (this.pendingResolve) {
-            this.pendingResolve(response.access_token);
-            this.pendingResolve = null;
-            this.pendingReject = null;
-          }
-        },
-      });
+            this.accessToken = response.access_token;
+            this.tokenExpiry = Date.now() + (response.expires_in * 1000);
+            this.saveTokenToStorage();
+            if (this.pendingResolve) {
+              this.pendingResolve(response.access_token);
+              this.pendingResolve = null;
+              this.pendingReject = null;
+            }
+          },
+        });
 
-      this.isInitialized = true;
+        this.isInitialized = true;
+      } catch (error) {
+        // Clear the cached promise so subsequent calls can retry
+        this.initPromise = null;
+        throw error;
+      }
     })();
 
     return this.initPromise;
@@ -101,7 +107,7 @@ class GoogleAuthService {
    * Wait for Google Identity Services to be available
    */
   private waitForGoogleIdentityServices(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const checkInterval = setInterval(() => {
         if (window.google?.accounts?.oauth2) {
           clearInterval(checkInterval);
@@ -113,9 +119,10 @@ class GoogleAuthService {
       setTimeout(() => {
         clearInterval(checkInterval);
         if (!window.google?.accounts?.oauth2) {
-          throw new Error('Google Identity Services failed to load');
+          reject(new Error('Google Identity Services failed to load'));
+        } else {
+          resolve();
         }
-        resolve();
       }, 10000);
     });
   }

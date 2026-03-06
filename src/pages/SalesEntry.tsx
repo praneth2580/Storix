@@ -15,7 +15,13 @@ import { Loader } from '../components/Loader';
 export function SalesEntry() {
   useDataPolling(fetchProducts, 60000, 'Products');
   const { items: products, loading } = useAppSelector(state => state.inventory);
-  
+
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [customerName, setCustomerName] = useState('');
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -23,12 +29,6 @@ export function SalesEntry() {
       </div>
     );
   }
-
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [customerName, setCustomerName] = useState('');
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const handleAddToCart = () => {
     const product = products.find(p => p.id === selectedProduct);
     if (!product) return;
@@ -63,7 +63,7 @@ export function SalesEntry() {
 
     const invoiceId = `INV-${Math.floor(Math.random() * 10000)}`;
     const invoiceDate = orderDate ? new Date(orderDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    
+
     const itemsRows = cart.map(item => `
       <tr>
         <td>${item.name}</td>
@@ -354,12 +354,12 @@ export function SalesEntry() {
               <label className="text-[10px] text-text-muted uppercase">
                 Customer Name
               </label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
-                className="w-full bg-primary border border-border-primary p-2 text-sm text-text-primary focus:border-accent-blue focus:outline-none rounded-sm" 
-                placeholder="Walk-in Customer" 
+                className="w-full bg-primary border border-border-primary p-2 text-sm text-text-primary focus:border-accent-blue focus:outline-none rounded-sm"
+                placeholder="Walk-in Customer"
               />
             </div>
             <div className="space-y-1">
@@ -368,11 +368,11 @@ export function SalesEntry() {
               </label>
               <div className="relative">
                 <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={orderDate}
                   onChange={e => setOrderDate(e.target.value)}
-                  className="w-full bg-primary border border-border-primary p-2 pl-9 text-sm text-text-primary focus:border-accent-blue focus:outline-none rounded-sm" 
+                  className="w-full bg-primary border border-border-primary p-2 pl-9 text-sm text-text-primary focus:border-accent-blue focus:outline-none rounded-sm"
                 />
               </div>
             </div>
@@ -506,7 +506,7 @@ export function SalesEntry() {
       </div>
 
       <div className="p-6 border-t border-border-primary bg-tertiary">
-        <button 
+        <button
           onClick={handleDownloadInvoice}
           disabled={cart.length === 0}
           className="w-full bg-accent-blue hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 font-bold rounded-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all mb-3"
