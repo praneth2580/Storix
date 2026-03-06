@@ -281,7 +281,7 @@ export function App() {
             <Menu size={24} />
           </button>
           <img
-            src="/Storix/logo.png"
+            src={`${import.meta.env.BASE_URL}logo.png`}
             alt="Storix Logo"
             className="h-6 w-auto object-contain"
           />

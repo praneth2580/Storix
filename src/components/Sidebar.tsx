@@ -82,9 +82,9 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
       {/* Brand Section */}
       <div className={`h-16 flex items-center px-4 border-b border-border-primary/50 border-gray-500 relative ${isExpanded ? 'justify-between' : 'justify-center lg:justify-center justify-between'}`}>
         <div className={`flex items-center transition-all duration-300 overflow-hidden ${isExpanded ? 'gap-3' : 'gap-3 lg:gap-0'}`}>
-          <img 
-            src="/logo.png" 
-            alt="Storix Logo" 
+          <img
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt="Storix Logo"
             className="w-8 h-8 object-contain shrink-0"
           />
           <span className={`font-bold text-lg tracking-tight text-text-primary transition-all duration-300 overflow-hidden whitespace-nowrap ${isExpanded ? 'opacity-100 w-auto' : 'lg:opacity-0 lg:w-0 opacity-100 w-auto'}`}>

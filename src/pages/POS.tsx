@@ -430,10 +430,10 @@ export function POS() {
         <div class="invoice-box">
           <div class="header-section">
             <div class="invoice-logo">
-              <img src="/Storix/pos-logo.png" alt="Storix POS Logo" />
+              <img src="${import.meta.env.BASE_URL}pos-logo.png" alt="Storix POS Logo" />
             </div>
             <div class="invoice-banner">
-              <img src="/Storix/pos-banner.png" alt="Storix POS Banner" />
+              <img src="${import.meta.env.BASE_URL}pos-banner.png" alt="Storix POS Banner" />
             </div>
             <div class="invoice-number">Invoice #${invoiceId}</div>
           </div>

@@ -61,7 +61,7 @@ export function Login({
         {/* Banner Image */}
         <div className="mb-8 flex justify-center">
           <img
-            src="/Storix/banner.png"
+            src={`${import.meta.env.BASE_URL}banner.png`}
             alt="Storix Banner"
             className="h-20 w-auto object-contain"
           />
@@ -69,7 +69,7 @@ export function Login({
 
         <div className="flex items-center gap-3 mb-8">
           <img
-            src="/Storix/logo.png"
+            src={`${import.meta.env.BASE_URL}logo.png`}
             alt="Storix Logo"
             className="w-10 h-10 object-contain"
           />
